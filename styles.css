@@ -464,3 +464,25 @@ body{-webkit-font-smoothing:antialiased}
   .gx-top{bottom:calc(80px + env(safe-area-inset-bottom));right:14px;width:40px;height:40px}
   .gx-seg{max-width:100%;overflow-x:auto}
 }
+
+/* ===== touch & iOS fixes ===== */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+.gx button,.gx select,.gx a,.gx label{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+#map svg{touch-action:pan-x pan-y pinch-zoom}
+@media (max-width:720px){
+  .gx input,.gx select{font-size:16px!important}   /* below 16px iOS zooms the page on focus */
+  .gx-f select{line-height:1.3}
+  .gx-filters.open{max-height:calc(100dvh - 48px);overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  .gx-kpis,.gx-ins,.gx-layers,.gx-seg{-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+}
+@media (hover:none){
+  .gx-pc:hover,.gx-in:hover,.gx-kpi:hover,.gx-top:hover{transform:none!important;box-shadow:none!important}
+  .gx-card:hover{box-shadow:none}
+}
+/* older Safari without color-mix(): keep surfaces solid */
+@supports not (color:color-mix(in srgb,red 50%,blue)){
+  .gx-nav{background:var(--color-bg)}
+  .gx-tabs{background:var(--color-panel)!important}
+  .gx-kpi .kic,.gx-ftoggle .n{background:var(--color-bg)}
+  .gx-tabs button[aria-selected=true] .i{background:var(--color-bg)}
+}

@@ -414,7 +414,7 @@
       lab.attr('x', (d) => d.px + rr(d) / Math.sqrt(k) + 3 / k).attr('y', (d) => d.py).style('font-size', `${10.5 / (s * k)}px`);
     };
     const zoom = d3.zoom().scaleExtent([1, 10]).translateExtent([[0, 0], [W, H]]).extent([[0, 0], [W, H]])
-      .filter((e) => (e.type === 'wheel' ? e.ctrlKey || e.metaKey : !e.button))
+      .filter((e) => (e.type === 'wheel' ? e.ctrlKey || e.metaKey : e.type && e.type.startsWith('touch') ? e.touches.length >= 2 : !e.button)) // one finger scrolls the page; two fingers pinch the map
       .on('zoom', (e) => { zoomT = e.transform; g.attr('transform', e.transform); paint(e.transform.k); });
     svg.call(zoom).on('dblclick.zoom', null);
     if (q.country !== lastCountry) {
