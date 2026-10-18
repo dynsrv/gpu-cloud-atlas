@@ -464,32 +464,3 @@ body{-webkit-font-smoothing:antialiased}
   .gx-top{bottom:calc(80px + env(safe-area-inset-bottom));right:14px;width:40px;height:40px}
   .gx-seg{max-width:100%;overflow-x:auto}
 }
-
-/* hero illustration: wireframe direct-to-chip liquid cooling loop */
-.gx-herotop{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,460px);gap:var(--s6);align-items:center}
-.gx-herotop .gx-head{padding-right:0}
-.gx-art{margin:28px 0 0;min-width:0;color:var(--gx-gblue)}
-.gx-art svg{display:block;width:100%;height:auto;overflow:visible}
-.gx-art .wf{fill:none;stroke:currentColor;stroke-opacity:.55;stroke-width:1.2;stroke-linejoin:round}
-.gx-art .wf.thin{stroke-width:.9;stroke-opacity:.4}
-.gx-art .plate{fill:color-mix(in srgb,var(--gx-gblue) 18%,transparent);stroke:currentColor;stroke-width:1}
-.gx-art .led{fill:#32A467}
-.gx-art .sup,.gx-art .ret{fill:none;stroke-width:1.6;stroke-linecap:round}
-.gx-art .sup{stroke:var(--gx-gblue)}
-.gx-art .ret{stroke:#E76A2E}
-.gx-art .flow{stroke-dasharray:3 7;stroke-width:2.2}
-.gx-art .lead{fill:none;stroke:var(--color-fg-muted);stroke-width:.8;stroke-dasharray:2 2}
-.gx-art .heat{fill:none;stroke:#E76A2E;stroke-opacity:.6;stroke-width:1.2;stroke-linecap:round}
-.gx-art text{font:500 10.5px var(--gx-sans);fill:var(--color-fg-muted);letter-spacing:.01em}
-@media (prefers-reduced-motion:no-preference){
-  .gx-art .flow{animation:gxFlow 1.6s linear infinite}
-  .gx-art .flow.r{animation-duration:1.9s}
-  .gx-art .fan{animation:gxFan 2.4s linear infinite}
-  .gx-art .heat{animation:gxHeat 2.6s ease-in-out infinite}
-  @keyframes gxFlow{to{stroke-dashoffset:-20}}
-  @keyframes gxFan{to{transform:rotate(360deg)}}
-  @keyframes gxHeat{0%,100%{opacity:.25;transform:translateY(2px)}50%{opacity:1;transform:translateY(-2px)}}
-}
-@media (max-width:1100px){.gx-herotop{grid-template-columns:minmax(0,1fr) minmax(240px,340px)}}
-@media (max-width:820px){.gx-herotop{grid-template-columns:1fr}.gx-art{margin:0;max-width:420px}}
-@media (max-width:720px){.gx-art{max-width:340px;width:100%;margin:0 auto}}
