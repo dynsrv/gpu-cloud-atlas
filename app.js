@@ -35,6 +35,27 @@
   function openProfile(name) { set({ sel: name, tab: 'directory' }); dash.setLink('directory'); requestAnimationFrame(() => { const d = $('#detail'); if (d && !d.hidden) d.scrollIntoView({ block: 'start', behavior: 'smooth' }); }); }
   document.querySelectorAll('.gx-tabs button').forEach((b) => b.addEventListener('click', () => { set({ tab: b.dataset.tab }); dash.setLink(b.dataset.tab); }));
 
+  /* ---------- v3 interaction layer: sticky nav, mobile filter sheet, back-to-top ---------- */
+  const ICON = (n) => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('class', 'i'); s.setAttribute('aria-hidden', 'true'); const u = document.createElementNS('http://www.w3.org/2000/svg', 'use'); u.setAttribute('href', '#i-' + n); s.append(u); return s; };
+  const nav = document.querySelector('.gx-nav'), fBox = $('#filters'), fTog = $('#f-toggle'), scrim = $('#f-scrim'), mbar = document.querySelector('.gx-mbar');
+  const searchLab = document.querySelector('.gx-search'), searchHome = searchLab.nextSibling;
+  const phone = matchMedia('(max-width:720px)');
+  const placeSearch = () => { if (phone.matches) { if (searchLab.parentNode !== mbar) { mbar.prepend(searchLab); searchLab.classList.add('gx-msearch'); } } else if (searchLab.parentNode !== fBox) { fBox.insertBefore(searchLab, $('#f-reset')); searchLab.classList.remove('gx-msearch'); } };
+  placeSearch(); (phone.addEventListener ? phone.addEventListener('change', placeSearch) : phone.addListener(placeSearch));
+  const sheet = (open) => { fBox.classList.toggle('open', open); scrim.hidden = !open; fTog.setAttribute('aria-expanded', String(open)); document.documentElement.style.overflow = open && phone.matches ? 'hidden' : ''; if (open) { const f = fBox.querySelector('select'); if (f) f.focus({ preventScroll: true }); } else fTog.focus({ preventScroll: true }); };
+  fTog.addEventListener('click', () => sheet(true));
+  [scrim, $('#f-close'), $('#f-done')].forEach((el) => el.addEventListener('click', () => sheet(false)));
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && fBox.classList.contains('open')) sheet(false); });
+  phone.addEventListener && phone.addEventListener('change', () => { if (!phone.matches && fBox.classList.contains('open')) sheet(false); });
+  const toTop = $('#to-top');
+  toTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  let ticking = false;
+  const onScroll = () => { ticking = false; const r = nav.getBoundingClientRect(); nav.classList.toggle('stuck', r.top <= 0.5 && window.scrollY > 40); toTop.hidden = window.scrollY < 900; };
+  window.addEventListener('scroll', () => { if (!ticking) { ticking = true; setTimeout(onScroll, 60); } }, { passive: true });
+  onScroll();
+  // switching section from far down the page brings you to the top of the new section
+  document.querySelectorAll('.gx-tabs button').forEach((b) => b.addEventListener('click', () => { const y = nav.getBoundingClientRect().top + window.scrollY - 4; if (window.scrollY > y + 10) window.scrollTo({ top: phone.matches ? Math.max(0, y) : y, behavior: 'smooth' }); }));
+
   /* ---------- flags ---------- */
   let FLAGS = new Map();
   function flag(country) {
@@ -209,6 +230,8 @@
     fillSelect(sel.category, uniq('category').map((r) => [r, r]), q.category, 'All models');
     fillSelect(sel.ownership, OWN.map((o) => [o[0], o[1]]), q.ownership, 'Any ownership');
     if (qIn !== document.activeElement) qIn.value = q.q || '';
+    const nSet = ['vendor', 'region', 'country', 'category', 'ownership', 'city'].filter((k) => q[k]).length + (q.family && q.family !== 'H100' ? 1 : 0);
+    const fc = $('#f-count'); fc.hidden = !nSet; fc.textContent = String(nSet); $('#f-toggle').setAttribute('aria-label', nSet ? `Filters, ${nSet} active` : 'Filters');
     const chips = $('#f-chips'); const list = [];
     if (q.city) list.push(['Data center in ' + q.city, { city: null }]);
     if (q.sel) list.push(['Profile: ' + q.sel, { sel: null }]);
@@ -538,7 +561,9 @@
     const W = Math.max(300, el.clientWidth || 600), rowH = 26, m = { t: 26, r: 60, b: 6 };
     const H = m.t + m.b + groups.length * rowH;
     const svg = svgFor(el, W, H, 'Price range by GPU model');
-    const labels = groups.map((g) => `${g.k} · ${g.n}`);
+    const maxCh = W < 500 ? 15 : 40; const short = (t) => (t.length > maxCh ? t.slice(0, maxCh - 1) + '…' : t);
+    groups.forEach((g) => { g.lab = `${short(g.k)} · ${g.n}`; });
+    const labels = groups.map((g) => g.lab);
     const lw = Math.min(W * 0.34, measure(svg, labels) + 12);
     const all = groups.flatMap((g) => g.a.map((r) => r.usd));
     const x = d3.scaleLog([Math.max(0.01, d3.min(all) * 0.85), d3.max(all) * 1.15], [lw, W - m.r]);
@@ -550,7 +575,7 @@
     const g = svg.selectAll('g.row').data(groups).join('g').attr('class', 'row').attr('transform', (d, i) => `translate(0,${m.t + i * rowH})`);
     g.append('rect').attr('x', 0).attr('width', W).attr('height', rowH).attr('fill', (d) => (d.k === fam ? 'var(--color-bg)' : 'transparent')).attr('rx', 4);
     g.append('text').attr('x', lw - 10).attr('y', rowH / 2).attr('dy', '0.35em').attr('text-anchor', 'end')
-      .attr('class', (d) => (d.k === fam ? 'strong' : null)).style('cursor', 'pointer').text((d) => `${d.k} · ${d.n}`)
+      .attr('class', (d) => (d.k === fam ? 'strong' : null)).style('cursor', 'pointer').text((d) => d.lab)
       .on('click', (e, d) => set({ family: d.k }));
     g.append('rect').attr('x', (d) => x(d.q1)).attr('width', (d) => Math.max(2, x(d.q3) - x(d.q1))).attr('y', rowH / 2 - 6).attr('height', 12).attr('rx', 4)
       .attr('fill', (d) => (d.k === fam ? C(0) : MUTED)).attr('fill-opacity', 0.28);
@@ -826,6 +851,7 @@
     $(id).replaceChildren(...cards.map(([eb, big, parts, fc]) => {
       const d = document.createElement('div'); d.className = 'gx-in';
       const e = document.createElement('span'); e.className = 'gx-eyebrow'; e.textContent = eb;
+      const lo = String(eb).toLowerCase(); e.prepend(ICON(/city|cities|location/.test(lo) ? 'pin' : /hub|based|countr/.test(lo) ? 'flag' : /capacity|power|mw|gw/.test(lo) ? 'zap' : /cheap|price|median|rate|\$/.test(lo) ? 'tag' : /gpu|model|generation|vendor|chip/.test(lo) ? 'cpu' : /provider|operator|owner/.test(lo) ? 'building' : 'spark'));
       const b = document.createElement('span'); b.className = 'big'; b.textContent = big; if (fc) withFlag(b, fc);
       const p = document.createElement('span'); p.className = 'txt';
       parts.forEach((x) => { if (typeof x === 'string') p.append(x); else { const s = document.createElement('b'); s.textContent = x[0]; p.append(s); } });
