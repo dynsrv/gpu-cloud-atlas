@@ -8,7 +8,7 @@
   let params = readUrl();
   const writeUrl = () => { const u = new URLSearchParams(); Object.entries(params).forEach(([k, v]) => { if (v != null && v !== DEFAULTS[k]) u.set(k, v); }); const s = u.toString(); history.replaceState(null, '', location.pathname + (s ? '?' + s : '') + location.hash); };
   let queued = false;
-  const fire = () => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; subs.forEach((f) => { try { f(); } catch (e) { console.error(e); } }); }); };
+  const fire = () => { if (queued) return; queued = true; setTimeout(() => { queued = false; subs.forEach((f) => { try { f(); } catch (e) { console.error(e); } }); }, 0); };
   window.dash = {
     colors: ['#2D72D2', '#238551', '#C87619', '#7961DB', '#CD4246', '#00A396', '#DB2C6F', '#8EB125'],
     data: (id) => store[id] || { status: 'missing', data: null },
