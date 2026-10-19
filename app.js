@@ -118,15 +118,26 @@
     return cache.v;
   }
   // search matches the provider name, its HQ country, or any city where it runs a data center
-  const match = (p, s) => String(p.provider).toLowerCase().includes(s) || String(p.hq).toLowerCase().includes(s) || p.cities.some((c) => c.toLowerCase().includes(s));
+  const match = (p, s) => String(p.provider).toLowerCase().includes(s) || String(p.hq).toLowerCase().includes(s) || String(p.hq_city || '').toLowerCase().includes(s) || p.cities.some((c) => c.toLowerCase().includes(s));
+  // "San Jose, California" (city + state/district) when the HQ city is known; else the country
+  const hqPlace = (p, withCountry) => { const c = p.hq_city ? [p.hq_city, p.hq_admin && p.hq_admin !== p.hq_city ? p.hq_admin : null].filter(Boolean).join(', ') : ''; return c ? (withCountry ? `${c}, ${p.hq}` : c) : p.hq; };
+  // selected GPU model (null = all models); a chip maker or GPU model turns on "where to rent it" mode
+  const famSel = () => { const x = P().family; return x && x !== '__all' && x !== 'null' ? x : null; };
+  const chipOn = () => !!(P().vendor || famSel());
+  const chipName = () => famSel() || P().vendor || '';
+  const sells = (v, p) => { const q = P(); const F = famSel(); return (!F || p.fams.includes(F)) && (!q.vendor || p.fams.some((k) => (v.famInfo.get(k) || {}).vendor === q.vendor)); };
   function filt(v) {
     const q = P(); const s = String(q.q || '').toLowerCase();
-    const provs = v.provs.filter((p) => (!q.region || p.region === q.region) && (!q.category || p.category === q.category) &&
-      (!q.vendor || p.fams.some((k) => (v.famInfo.get(k) || {}).vendor === q.vendor)) && (!q.ownership || p.ownership === q.ownership) && (!q.country || p.hq === q.country) && (!q.city || p.cities.includes(q.city)) && (!s || match(p, s)));
+    const base = (p) => (!q.region || p.region === q.region) && (!q.category || p.category === q.category) &&
+      (!q.vendor || p.fams.some((k) => (v.famInfo.get(k) || {}).vendor === q.vendor)) && (!q.ownership || p.ownership === q.ownership) && (!q.country || p.hq === q.country) && (!q.city || p.cities.includes(q.city)) && (!s || match(p, s));
+    // GPU-mix charts compare models, so they ignore the GPU model filter
+    const provsAny = v.provs.filter(base);
+    const provs = provsAny.filter((p) => sells(v, p));
     const S = new Set(provs);
     // for data center cities, region/country/city describe where the city is, not the provider's HQ
-    const provsLoc = v.provs.filter((p) => (!q.vendor || p.fams.some((k) => (v.famInfo.get(k) || {}).vendor === q.vendor)) && (!q.category || p.category === q.category) && (!q.ownership || p.ownership === q.ownership) && (!s || match(p, s)));
-    return { provs, provsLoc, prices: v.prices.filter((r) => r.p && S.has(r.p)) };
+    const provsLoc = v.provs.filter((p) => sells(v, p) && (!q.category || p.category === q.category) && (!q.ownership || p.ownership === q.ownership) && (!s || match(p, s)));
+    const SA = new Set(provsAny);
+    return { provs, provsAny, provsLoc, prices: v.prices.filter((r) => r.p && S.has(r.p)), pricesAny: v.prices.filter((r) => r.p && SA.has(r.p)) };
   }
   function provMin(prices, fam) {
     const m = new Map();
@@ -138,12 +149,10 @@
   // picking a chip maker keeps the GPU focus only if it is one of that maker's chips
   function vendorChange(vd) {
     const v = cache.v; const fam = P().family;
-    const keep = !vd || fam === '__all' || (v && v.famInfo.get(fam) && v.famInfo.get(fam).vendor === vd);
-    if (keep) return { vendor: vd };
-    const first = v ? [...v.famInfo.values()].find((x) => x.vendor === vd && v.prices.some((r) => r.family === x.family && r.usd != null)) : null;
-    return { vendor: vd, family: first ? first.family : '__all' };
+    const keep = !vd || !fam || fam === '__all' || (v && v.famInfo.get(fam) && v.famInfo.get(fam).vendor === vd);
+    return keep ? { vendor: vd } : { vendor: vd, family: null };
   }
-  const focus = () => (P().family === '__all' ? ANY_GPU : P().family || 'H100');
+  const focus = () => famSel() || ANY_GPU;
 
   /* ---------- helpers ---------- */
   function svgFor(el, W, H, label) {
@@ -191,7 +200,7 @@
 
   /* ---------- filters ---------- */
   const sel = { vendor: $('#f-vendor'), family: $('#f-family'), region: $('#f-region'), country: $('#f-country'), category: $('#f-category'), ownership: $('#f-ownership') };
-  Object.entries(sel).forEach(([k, el]) => el.addEventListener('change', () => set(k === 'region' ? { region: el.value || null, country: null } : k === 'vendor' ? vendorChange(el.value || null) : { [k]: el.value || (k === 'family' ? 'H100' : null) })));
+  Object.entries(sel).forEach(([k, el]) => el.addEventListener('change', () => set(k === 'region' ? { region: el.value || null, country: null } : k === 'vendor' ? vendorChange(el.value || null) : { [k]: el.value && el.value !== '__all' ? el.value : null })));
   const qIn = $('#f-q'); let qT;
   qIn.addEventListener('input', () => { clearTimeout(qT); qT = setTimeout(() => set({ q: qIn.value.trim() || null }), 220); });
   $('#f-reset').addEventListener('click', () => { dash.resetParams(); qIn.value = ''; });
@@ -221,18 +230,20 @@
     const pricedN = d3.rollup(v.prices.filter((r) => r.usd != null), (a) => new Set(a.map((r) => r.provider)).size, (r) => r.family);
     const vn = new Map(); v.provs.forEach((p) => new Set(p.fams.map((k) => (v.famInfo.get(k) || {}).vendor).filter(Boolean)).forEach((x) => vn.set(x, (vn.get(x) || 0) + 1)));
     fillSelect(sel.vendor, VENDORS.filter((x) => vn.get(x)).map((x) => [x, `${x} (${vn.get(x)} providers)`]), q.vendor, 'All chips');
-    fillSelect(sel.family, [['__all', `${q.vendor ? 'All ' + q.vendor + ' models' : 'All models'} (${new Set(v.prices.filter((r) => r.usd != null && r.segment && (!q.vendor || r.vendor === q.vendor)).map((r) => r.provider)).size} priced)`]].concat([...v.famInfo.keys()].filter((f) => pricedN.get(f) && (!q.vendor || v.famInfo.get(f).vendor === q.vendor)).map((f) => [f, `${f} · ${v.famInfo.get(f).vendor} (${pricedN.get(f)} priced)`])), P().family || 'H100');
+    const famN = new Map(); v.provs.forEach((p) => p.fams.forEach((k) => famN.set(k, (famN.get(k) || 0) + 1)));
+    const famOpts = [...v.famInfo.values()].filter((x) => famN.get(x.family) && (!q.vendor || x.vendor === q.vendor)).sort((a, b) => d3.ascending(a.vendor, b.vendor) || b.year - a.year || d3.ascending(a.family, b.family));
+    fillSelect(sel.family, famOpts.map((x) => [x.family, `${x.family} · ${x.vendor} (${famN.get(x.family)})`]), famSel(), q.vendor ? `All ${q.vendor} models` : 'All models');
     const uniq = (k) => [...new Set(v.provs.map((p) => p[k]))].filter(Boolean).sort();
     fillSelect(sel.region, uniq('region').filter((r) => r !== 'Unknown').map((r) => [r, r]), q.region, 'All regions');
     const cs = [...new Set(v.provs.filter((p) => p.hq !== 'Unknown' && (!q.region || p.region === q.region)).map((p) => p.hq))].sort();
     if (q.country && !cs.includes(q.country)) cs.unshift(q.country);
     fillSelect(sel.country, cs.map((c) => [c, c]), q.country, 'All countries');
-    Object.entries(sel).forEach(([k, el]) => el.closest('.gx-f').classList.toggle('is-set', k === 'family' ? false : !!q[k]));
+    Object.entries(sel).forEach(([k, el]) => el.closest('.gx-f').classList.toggle('is-set', k === 'family' ? !!famSel() : !!q[k]));
     qIn.closest('.gx-f').classList.toggle('is-set', !!q.q);
     fillSelect(sel.category, uniq('category').map((r) => [r, r]), q.category, 'All models');
     fillSelect(sel.ownership, OWN.map((o) => [o[0], o[1]]), q.ownership, 'Any ownership');
     if (qIn !== document.activeElement) qIn.value = q.q || '';
-    const nSet = ['vendor', 'region', 'country', 'category', 'ownership', 'city'].filter((k) => q[k]).length + (q.family && q.family !== 'H100' ? 1 : 0);
+    const nSet = ['vendor', 'region', 'country', 'category', 'ownership', 'city'].filter((k) => q[k]).length + (famSel() ? 1 : 0);
     const fc = $('#f-count'); fc.hidden = !nSet; fc.textContent = String(nSet); $('#f-toggle').setAttribute('aria-label', nSet ? `Filters, ${nSet} active` : 'Filters');
     const chips = $('#f-chips'); const list = [];
     if (q.city) list.push(['Data center in ' + q.city, { city: null }]);
@@ -315,7 +326,12 @@
     const cxy0 = new Map(sc.data.map((c) => [c.country, [+c.px, +c.py]]));
     const pvCities = pv ? [...new Map(v.cities.filter((r) => r.provider === pv.provider).map((r) => [r.city + '|' + r.country, { city: r.city, country: r.country, px: +r.px, py: +r.py, n: 1, provs: [pv.provider] }])).values()] : [];
     const pvCountries = new Set(pvCities.map((c) => c.country));
-    const hqXY = pv ? cxy0.get(pv.hq) : null;
+    const hqXY = pv ? (pv.hq_px != null && pv.hq_px !== '' ? [+pv.hq_px, +pv.hq_py] : cxy0.get(pv.hq)) : null;
+    // chip finder: with a chip maker or GPU model picked, the providers layer shades countries by providers
+    // that sell it AND run a data center there, and shows the cities
+    const chip = chipOn() && !pv && m === 'providers';
+    const dcN = new Map();
+    if (chip) { const SL = new Set(f.provsLoc.map((p) => p.provider)); v.cities.forEach((r) => { if (!SL.has(r.provider)) return; (dcN.get(r.country) || dcN.set(r.country, new Set()).get(r.country)).add(r.provider); }); }
     const svg = svgFor(el, W, H, 'World map of GPU providers and data center cities');
     const defs = svg.append('defs');
     defs.append('clipPath').attr('id', 'gx-map-clip').append('rect').attr('width', W).attr('height', H).attr('rx', 12);
@@ -361,17 +377,19 @@
     g.append('g').selectAll('path').data(sw.data).join('path')
       .attr('d', (d) => d.d)
       .attr('class', (d) => 'cpath' + (agg.has(d.country) ? ' has' : ''))
-      .attr('fill', (d) => { if (pv) return d.country === pv.hq ? 'var(--gx-sel)' : pvCountries.has(d.country) ? 'var(--gx-hov)' : 'var(--gx-land)'; if (q.country === d.country) return 'var(--gx-sel)'; const a = agg.get(d.country); if (!a) return 'var(--gx-land)'; return hasVal(a) ? shade(cval(a)) : 'url(#gx-hatch)'; })
+      .attr('fill', (d) => { if (pv) return d.country === pv.hq ? 'var(--gx-sel)' : pvCountries.has(d.country) ? 'var(--gx-hov)' : 'var(--gx-land)'; if (q.country === d.country) return 'var(--gx-sel)'; if (chip) { const n = dcN.has(d.country) ? dcN.get(d.country).size : 0; return n ? shade(n) : agg.has(d.country) ? 'url(#gx-hatch)' : 'var(--gx-land)'; } const a = agg.get(d.country); if (!a) return 'var(--gx-land)'; return hasVal(a) ? shade(cval(a)) : 'url(#gx-hatch)'; })
       .attr('fill-opacity', (d) => (!pv && q.country && q.country !== d.country ? 0.45 : 1))
       .attr('stroke', 'var(--gx-border)').attr('stroke-opacity', 0.45).attr('stroke-width', 0.35).attr('vector-effect', 'non-scaling-stroke')
-      .style('cursor', (d) => (agg.has(d.country) ? 'pointer' : null))
-      .on('mousemove', countryTip).on('mouseleave', tipHide)
-      .on('click', (e, d) => agg.has(d.country) && set({ country: q.country === d.country ? null : d.country, city: null }));
+      .style('cursor', (d) => (agg.has(d.country) || dcN.has(d.country) ? 'pointer' : null))
+      .on('mousemove', (e, d) => { if (!chip) return countryTip(e, d); const ps = dcN.get(d.country); const a = agg.get(d.country); if (!ps && !a) return tipHide();
+        tipShow(e, d.country, [[`Sell ${chipName()} with a data center here`, ps ? String(ps.size) : '0'], ['', ps ? trunc([...ps].sort((a, b) => ((v.byName.get(b) || {}).op || 0) - ((v.byName.get(a) || {}).op || 0)).slice(0, 8).join(', ') + (ps.size > 8 ? ` +${ps.size - 8} more` : ''), 220) : ''], [`Headquartered here, sell ${chipName()}`, a ? String(a.n) : '0']]); })
+      .on('mouseleave', tipHide)
+      .on('click', (e, d) => (agg.has(d.country) || dcN.has(d.country)) && set({ country: q.country === d.country ? null : d.country, city: null }));
     g.selectAll('path').filter((d) => d && d.country === q.country).raise();
 
     // circles only for cities
     // city circles belong to layers about physical infrastructure: cities, live power, planned power
-    const showCities = !!pv || ['cities', 'op', 'pl'].includes(m);
+    const showCities = !!pv || chip || ['cities', 'op', 'pl'].includes(m);
     const pts = pv ? pvCities : showCities ? cityAgg(v, f).sort((a, b) => b.n - a.n) : [];
     const rS = d3.scaleSqrt([0, d3.max(pts, (c) => c.n) || 1], [0, m === 'cities' ? 15 : 12]);
     const rr = (d) => (pv ? 4.6 : Math.max(m === 'cities' ? 2.6 : 2.2, rS(d.n)));
@@ -383,14 +401,14 @@
         .attr('d', (d) => { const [x0, y0] = hqXY; const x1 = d.px, y1 = d.py; const mx = (x0 + x1) / 2, my = (y0 + y1) / 2 - Math.hypot(x1 - x0, y1 - y0) * 0.22; return `M${x0},${y0}Q${mx},${my} ${x1},${y1}`; })
         .attr('fill', 'none').attr('stroke', 'var(--gx-gblue)').attr('stroke-width', 1.4).attr('stroke-opacity', 0.7).attr('stroke-dasharray', '4 3').attr('vector-effect', 'non-scaling-stroke');
     }
-    halo.selectAll('circle').data(pv ? pts : m === 'cities' || q.country ? pts.slice(0, 12) : []).join('circle').attr('cx', (d) => d.px).attr('cy', (d) => d.py).attr('fill', 'url(#gx-glow)');
+    halo.selectAll('circle').data(pv ? pts : m === 'cities' || chip || q.country ? pts.slice(0, 12) : []).join('circle').attr('cx', (d) => d.px).attr('cy', (d) => d.py).attr('fill', 'url(#gx-glow)');
     const dots = g.append('g').selectAll('circle').data(pts).join('circle')
       .attr('cx', (d) => d.px).attr('cy', (d) => d.py)
       .attr('fill', 'var(--gx-city)').attr('fill-opacity', m === 'cities' ? 0.92 : 0.8)
       .attr('stroke', (d) => (isOn(d) ? 'var(--color-fg)' : 'var(--gx-border)'))
       .style('cursor', 'pointer')
       .on('click', (e, d) => { if (!pv) set({ city: q.city === d.city ? null : d.city }); })
-      .on('mousemove', (e, d) => (pv ? tipShow(e, `${d.city}, ${d.country}`, [['Data center of', pv.provider], ['Headquarters', pv.hq]]) : tipShow(e, `${d.city}, ${d.country}`, [['Providers with a data center here', String(d.n)], ['', trunc(d.provs.slice(0, 8).join(', ') + (d.n > 8 ? ` +${d.n - 8} more` : ''), 220)]])))
+      .on('mousemove', (e, d) => (pv ? tipShow(e, `${d.city}, ${d.country}`, [['Data center of', pv.provider], ['Headquarters', hqPlace(pv, true)]]) : tipShow(e, `${d.city}, ${d.country}`, [['Providers with a data center here', String(d.n)], ['', trunc(d.provs.slice(0, 8).join(', ') + (d.n > 8 ? ` +${d.n - 8} more` : ''), 220)]])))
       .on('mouseleave', tipHide);
     // country names sized to the country's footprint on the map (no outline); shown only where the name fits
     const cxy = new Map(sc.data.map((c) => [c.country, [+c.px, +c.py]]));
@@ -410,9 +428,9 @@
     if (pv && hqXY) {
       hqm.append('circle').attr('class', 'hqring').attr('cx', hqXY[0]).attr('cy', hqXY[1]).attr('fill', 'none').attr('stroke', 'var(--gx-gblue)');
       hqm.append('circle').attr('class', 'hqdot').attr('cx', hqXY[0]).attr('cy', hqXY[1]).attr('fill', 'var(--gx-gblue)').attr('stroke', '#fff');
-      hqm.append('text').attr('class', 'hqlab').attr('x', hqXY[0]).attr('y', hqXY[1]).attr('text-anchor', 'middle').text('HQ · ' + pv.hq);
+      hqm.append('text').attr('class', 'hqlab').attr('x', hqXY[0]).attr('y', hqXY[1]).attr('text-anchor', 'middle').text('HQ · ' + (pv.hq_city || pv.hq));
     }
-    const lab = g.append('g').attr('pointer-events', 'none').selectAll('text').data(showCities ? pts.slice(0, pv ? 40 : m === 'cities' || q.country ? 12 : 0) : []).join('text')
+    const lab = g.append('g').attr('pointer-events', 'none').selectAll('text').data(showCities ? pts.slice(0, pv ? 40 : m === 'cities' || chip || q.country ? 14 : 0) : []).join('text')
       .attr('class', 'citylab').attr('dominant-baseline', 'central').text((d) => d.city);
     const paint = (k) => {
       dots.attr('r', (d) => rr(d) / Math.sqrt(k)).attr('stroke-width', (d) => (isOn(d) ? 2 : 1) / k);
@@ -423,7 +441,7 @@
       const boxOf = (x, y, w, hgt) => [x - w / 2, y - hgt / 2, x + w / 2, y + hgt / 2];
       const hit = (b) => placed.some((p) => b[0] < p[2] && b[2] > p[0] && b[1] < p[3] && b[3] > p[1]);
       // city names: biggest first, skip any that would collide with a name (or the HQ tag) already placed
-      if (pv && hqXY) { const hw = ((pv.hq.length + 5) * 11 * 0.6) / (s * k), hh2 = 15 / (s * k), hy = hqXY[1] - 16 / Math.sqrt(k); placed.push([hqXY[0] - hw / 2, hy - hh2 / 2, hqXY[0] + hw / 2, hy + hh2 / 2]); }
+      if (pv && hqXY) { const hw = (((pv.hq_city || pv.hq).length + 5) * 11 * 0.6) / (s * k), hh2 = 15 / (s * k), hy = hqXY[1] - 16 / Math.sqrt(k); placed.push([hqXY[0] - hw / 2, hy - hh2 / 2, hqXY[0] + hw / 2, hy + hh2 / 2]); }
       const cityShow = new Set();
       lab.each((d) => { const w = (d.city.length * 10.5 * 0.56) / (s * k), hh = 13 / (s * k), x0 = d.px + rr(d) / Math.sqrt(k) + 3 / k; const bx = [x0, d.py - hh / 2, x0 + w, d.py + hh / 2]; if (hit(bx)) return; placed.push(bx); cityShow.add(d); });
       lab.style('display', (d) => (cityShow.has(d) ? null : 'none'));
@@ -473,12 +491,12 @@
     const fm = provMin(f.prices, fam); mv('price_l', `${fam} price`); mv('price', fm.length ? `${f$(d3.median(fm, (r) => r.usd))} median` : '—');
     const ca = cityAgg(v, f); mv('cities', `${fInt(ca.length)} cities`);
     const titles = { providers: 'Providers by HQ country', op: 'Live capacity by HQ country', pl: 'Planned capacity by HQ country', price: `${fam} price by HQ country`, cities: 'Data center cities and live capacity' };
-    $('#map-title').textContent = titles[m];
+    $('#map-title').textContent = chip ? `Where to rent ${chipName()}` : titles[m];
     const lg = $('#map-legend');
     lg.replaceChildren();
     if (labels.length) {
       const st = document.createElement('span'); st.className = 'steps';
-      const ttl = { providers: 'Providers headquartered', op: 'Live capacity', pl: 'Planned capacity', price: `Median ${fam} $/GPU-hr` }[sm];
+      const ttl = chip ? `Providers with ${chipName()} data centers` : { providers: 'Providers headquartered', op: 'Live capacity', pl: 'Planned capacity', price: `Median ${fam} $/GPU-hr` }[sm];
       const sb = document.createElement('span'); sb.className = 'sb';
       const s6 = document.createElement('span'); s6.className = 'sw6'; const l6 = document.createElement('span'); l6.className = 'lb6';
       shade.range().forEach((c, i) => { const ii = document.createElement('i'); ii.style.background = c; s6.append(ii); const em = document.createElement('em'); em.textContent = labels[i] || ''; l6.append(em); });
@@ -486,6 +504,7 @@
     }
     if (sm !== 'price') { const s = document.createElement('span'); const i = document.createElement('i'); i.style.background = 'repeating-linear-gradient(45deg,var(--gx-land) 0 2px,var(--gx-line-strong) 2px 3px)'; s.append(i, sm === 'providers' ? '' : 'Providers, no MW disclosed'); if (sm !== 'providers') lg.append(s); }
     else { const s = document.createElement('span'); const i = document.createElement('i'); i.style.background = 'var(--gx-land)'; s.append(i, 'No price published'); lg.append(s); }
+    if (chip) { const s = document.createElement('span'); const i = document.createElement('i'); i.style.background = 'repeating-linear-gradient(45deg,var(--gx-land) 0 2px,var(--gx-line-strong) 2px 3px)'; s.append(i, 'HQ only, no city named'); lg.append(s); }
     if (pts.length) { const s = document.createElement('span'); const i = document.createElement('i'); i.style.background = 'var(--gx-city)'; i.style.borderRadius = '50%'; s.append(i, `Data center cities${q.country ? ' in ' + q.country : ''}, sized by providers present`); lg.append(s); }
     const unk = f.provs.filter((p) => p.hq === 'Unknown').length;
     const withCity = new Set(v.cities.map((r) => r.provider)); const fc = f.provs.filter((p) => withCity.has(p.provider)).length;
@@ -494,10 +513,14 @@
       : (unk ? `${unk} provider${unk > 1 ? 's' : ''} without a stated HQ ${unk > 1 ? 'are' : 'is'} not on the map. ` : '') +
         (m === 'op' || m === 'pl' ? 'Only providers that publish an MW figure count. ' : m === 'price' ? `Color is the median of each provider's lowest ${fam} rate. ` : '') + 'Ctrl/⌘ + scroll to zoom.';
     $('#map-note').textContent = $('#map-note').textContent.replace(/\s*Ctrl\/⌘ \+ scroll( or the buttons)? to zoom\.?/, '').trim();
+    if (chip) {
+      const withC = new Set(v.cities.map((r) => r.provider)); const nS = f.provsLoc.length; const nC = f.provsLoc.filter((p) => withC.has(p.provider)).length;
+      $('#map-note').textContent = `${nC} of ${nS} providers selling ${chipName()} name their data center cities. Tap a country or city to list who sells it there.`;
+    }
     document.querySelector('#map-card').classList.toggle('pv-on', !!pv);
     if (pv) {
       $('#map-title').textContent = `${pv.provider}: headquarters and data centers`;
-      $('#map-note').textContent = pvCities.length ? `Headquartered in ${pv.hq}. ${pvCities.length} data center ${pvCities.length === 1 ? 'city' : 'cities'} named in ${pvCountries.size} ${pvCountries.size === 1 ? 'country' : 'countries'}. Pick a map layer to go back to the overview.` : `Headquartered in ${pv.hq}. This provider doesn't name specific data center cities.`;
+      $('#map-note').textContent = pvCities.length ? `Headquartered in ${hqPlace(pv, true)}. ${pvCities.length} data center ${pvCities.length === 1 ? 'city' : 'cities'} named in ${pvCountries.size} ${pvCountries.size === 1 ? 'country' : 'countries'}. Pick a map layer to go back to the overview.` : `Headquartered in ${hqPlace(pv, true)}. This provider doesn't name specific data center cities.`;
       const it = (bg, txt, round, line) => { const s = document.createElement('span'); const i = document.createElement('i'); i.style.background = bg; if (round) i.style.borderRadius = '50%'; if (line) { i.style.height = '0'; i.style.borderTop = '2px dashed var(--gx-gblue)'; i.style.background = 'none'; i.style.width = '18px'; } s.append(i, txt); return s; };
       lg.replaceChildren(it('var(--gx-gblue)', 'Headquarters', true), it('var(--gx-city)', 'Data center city', true), it('', 'Route from HQ', false, true), it('var(--gx-hov)', 'Countries with its data centers'));
     }
@@ -641,6 +664,27 @@
       grid.append(b);
     });
     $('#ex-regions').replaceChildren(rh, grid);
+    // chip finder banner: linked to the Chip / GPU filters at the top
+    const chipBox = $('#ex-chip'); const chipC = chipOn();
+    const bigFirst = (names) => [...names].sort((a, b) => ((v.byName.get(b) || {}).op || 0) - ((v.byName.get(a) || {}).op || 0) || d3.ascending(a, b));
+    const dcBy = new Map(); { const SL = new Set(f.provsLoc.map((p) => p.provider)); v.cities.forEach((r) => { if (!SL.has(r.provider) || (q.region && r.region !== q.region)) return; const e = dcBy.get(r.country) || { provs: new Set(), cities: new Set() }; e.provs.add(r.provider); e.cities.add(r.city); dcBy.set(r.country, e); }); }
+    if (chipC) {
+      const nCity = d3.sum([...dcBy.values()], (e) => e.cities.size);
+      const t = document.createElement('div'); t.className = 'cht';
+      const b = document.createElement('b'); b.textContent = chipName(); const lab = document.createElement('span'); lab.textContent = 'Where to rent';
+      const x = document.createElement('button'); x.type = 'button'; x.className = 'chx'; x.setAttribute('aria-label', 'Clear chip filter'); x.append(ICON('x')); x.onclick = () => set({ family: null, vendor: null });
+      t.append(lab, b, x);
+      const st = document.createElement('div'); st.className = 'chs';
+      [[f.provsLoc.length, 'providers'], [dcBy.size, 'countries'], [nCity, 'cities']].forEach(([n, l]) => { const d = document.createElement('span'); const st2 = document.createElement('strong'); st2.textContent = fInt(n); d.append(st2, ' ' + l); st.append(d); });
+      chipBox.className = 'gx-chipbox on'; chipBox.replaceChildren(t, st);
+    } else {
+      const famN = new Map(); f.provsLoc.forEach((p) => p.fams.forEach((k) => famN.set(k, (famN.get(k) || 0) + 1)));
+      const top = [...famN].filter(([k]) => v.famInfo.has(k)).sort((a, b) => b[1] - a[1]).slice(0, 6);
+      const lab = document.createElement('span'); lab.className = 'chl'; lab.append(ICON('gpu'), ' Where to rent');
+      const row = document.createElement('div'); row.className = 'chr';
+      top.forEach(([k, n]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = k; b.title = `${n} providers offer ${k}`; b.onclick = () => set({ family: k, ex: q.ex === 'providers' || !q.ex ? 'countries' : q.ex, pv: null }); row.append(b); });
+      chipBox.className = 'gx-chipbox'; chipBox.replaceChildren(lab, row);
+    }
     // providers in view: headquartered here, or running a data center here
     const list = new Map(f.provs.map((p) => [p.provider, { p, hq: true, here: false }]));
     if (q.country || q.region || q.city) {
@@ -654,7 +698,7 @@
     const agg = countryAgg(f); const cities = cityAgg(v, f);
     const nP = [...list.values()].filter((e) => e.p).length;
     document.querySelector('[data-exn="providers"]').textContent = fInt(nP);
-    document.querySelector('[data-exn="countries"]').textContent = fInt(agg.size);
+    document.querySelector('[data-exn="countries"]').textContent = fInt(chipC ? dcBy.size : agg.size);
     document.querySelector('[data-exn="cities"]').textContent = fInt(cities.length);
     const where = q.city || q.country || q.region;
     $('#ex-count').textContent = where ? `in ${where}` : '';
@@ -668,15 +712,23 @@
       hint = 'Tap a provider to map its HQ and data centers';
       items = rows.map((e) => {
         const p = e.p; const br = best.get(p.provider);
-        const fl = flag(p.hq); const hqS = document.createElement('span'); hqS.className = 'hqs'; if (fl) hqS.append(fl); hqS.append(p.hq);
+        const fl = flag(p.hq); const hqS = document.createElement('span'); hqS.className = 'hqs'; if (fl) hqS.append(fl); hqS.append(p.hq_city || p.hq); hqS.title = 'HQ: ' + hqPlace(p, true);
         const sub = [hqS, document.createTextNode(` · ${p.ncity ? p.ncity + (p.ncity === 1 ? ' city' : ' cities') : 'no cities named'}`)];
         if (where && !q.city && !e.hq) sub.push(Object.assign(document.createElement('em'), { className: 'here', textContent: 'DC here' }));
         const val = ps === 'price' ? (br ? f$(br.usd) : '—') : ps === 'cities' ? String(p.ncity) : ps === 'name' ? (p.op != null ? fMW(p.op) : '') : p.op != null ? fMW(p.op) : '—';
         const valSub = ps === 'price' ? (br ? `${fam} ${TERM_SHORT[br.basis] || ''}` : fam) : ps === 'cities' ? 'cities' : p.op != null ? 'live' : '';
         const lead = document.createElement('span'); lead.className = 'lead'; lead.append(logo(p.provider, 'lg'));
-        return exItem({ on: q.pv === p.provider, lead, title: p.provider, sub, val, valSub, label: `${p.provider}, headquartered in ${p.hq}. Show on map`,
+        return exItem({ on: q.pv === p.provider, lead, title: p.provider, sub, val, valSub, label: `${p.provider}, headquartered in ${hqPlace(p, true)}. Show on map`,
           onClick: () => { set({ pv: q.pv === p.provider ? null : p.provider }); if (q.pv !== p.provider) showMap(); } });
       });
+    } else if (mode === 'countries' && chipC) {
+      const rows = [...dcBy].map(([c, e]) => ({ c, n: e.provs.size, nc: e.cities.size, e })).sort((a, b) => b.n - a.n || d3.ascending(a.c, b.c));
+      const mx = d3.max(rows, (r) => r.n) || 1;
+      hint = `Countries with a local ${chipName()} data center · tap to see who`;
+      items = rows.map((r) => exItem({ on: q.country === r.c, lead: flagLead(r.c), title: r.c,
+        sub: `${r.nc} ${r.nc === 1 ? 'city' : 'cities'} · ${trunc(bigFirst(r.e.provs).slice(0, 3).join(', ') + (r.n > 3 ? ` +${r.n - 3}` : ''), 60)}`,
+        val: fInt(r.n), valSub: r.n === 1 ? 'provider' : 'providers', bar: r.n / mx, color: 'var(--gx-pv6)',
+        onClick: () => set({ country: q.country === r.c ? null : r.c, city: null, ex: q.country === r.c ? 'countries' : 'cities' }) }));
     } else if (mode === 'countries') {
       const m = q.metric || 'providers'; const mm = m === 'cities' ? 'providers' : m;
       let rows = [...agg].map(([c, a]) => ({ c, a }));
@@ -695,9 +747,10 @@
       const rows = cities.slice().sort((a, b) => b.n - a.n || d3.ascending(a.city, b.city));
       const mx = d3.max(rows, (c) => c.n) || 1;
       hint = 'Cities by providers with a data center there · tap to filter';
-      items = rows.map((c) => exItem({ on: q.city === c.city, lead: flagLead(c.country), title: c.city, sub: c.country,
+      if (chipC) hint = `Cities with a ${chipName()} data center · tap to see who`;
+      items = rows.map((c) => exItem({ on: q.city === c.city, lead: flagLead(c.country), title: c.city, sub: `${c.country} · ${trunc(bigFirst(c.provs).slice(0, 3).join(', ') + (c.n > 3 ? ` +${c.n - 3}` : ''), 60)}`,
         val: fInt(c.n), valSub: c.n === 1 ? 'provider' : 'providers', bar: c.n / mx, color: 'var(--gx-city)',
-        onClick: () => set({ city: q.city === c.city ? null : c.city, pv: null }) }));
+        onClick: () => set({ city: q.city === c.city ? null : c.city, pv: null, ex: q.city === c.city ? 'cities' : 'providers' }) }));
     }
     $('#ex-hint').textContent = hint;
     const LIM = 60; const more = $('#ex-more'); more.hidden = items.length <= LIM; more.textContent = exAll ? 'Show fewer' : `Show all ${fInt(items.length)}`;
@@ -711,7 +764,7 @@
     const fam = focus(); const br = provMin(v.prices.filter((r) => r.provider === p.provider), fam)[0];
     const head = document.createElement('div'); head.className = 'fh';
     const nm = document.createElement('div'); nm.className = 'fn'; const t = document.createElement('b'); t.textContent = p.provider; withLogo(t, p.provider, 'lg');
-    const sub = document.createElement('span'); sub.className = 'fs'; const hq = document.createElement('span'); hq.className = 'hqs'; hq.append('HQ '); const fl = flag(p.hq); if (fl) hq.append(fl); hq.append(p.hq); sub.append(hq, ` · ${p.category}`);
+    const sub = document.createElement('span'); sub.className = 'fs'; const hq = document.createElement('span'); hq.className = 'hqs'; hq.append('HQ '); const fl = flag(p.hq); if (fl) hq.append(fl); hq.append(hqPlace(p, true)); sub.append(hq, ` · ${p.category}`);
     nm.append(t, sub);
     const acts = document.createElement('div'); acts.className = 'fa';
     const prof = document.createElement('button'); prof.type = 'button'; prof.className = 'gx-btn gx-pri'; prof.textContent = 'Full profile'; prof.onclick = () => openProfile(p.provider);
@@ -735,7 +788,7 @@
   /* ---------- pricing ---------- */
   function drawStrip(v, f) {
     const el = $('#strip'); const fam = focus();
-    let groups = d3.groups(f.prices.filter((r) => r.usd != null && v.famInfo.has(r.family) && (!P().vendor || v.famInfo.get(r.family).vendor === P().vendor)), (r) => r.family)
+    let groups = d3.groups(f.pricesAny.filter((r) => r.usd != null && v.famInfo.has(r.family) && (!P().vendor || v.famInfo.get(r.family).vendor === P().vendor)), (r) => r.family)
       .filter(([k, a]) => a.length >= 3 || k === fam)
       .map(([k, a]) => { const s = a.map((r) => r.usd).sort(d3.ascending); return { k, a, n: a.length, q1: d3.quantileSorted(s, 0.25), med: d3.quantileSorted(s, 0.5), q3: d3.quantileSorted(s, 0.75) }; })
       .sort((a, b) => b.n - a.n).slice(0, 22).sort((a, b) => b.med - a.med);
@@ -885,6 +938,7 @@
 
   /* ---------- hardware ---------- */
   function drawAvail(v, f) {
+    f = { ...f, provs: f.provsAny }; // GPU mix compares models, so the GPU model filter is not applied
     const el = $('#avail'); const fam = focus();
     const cnt = new Map(); f.provs.forEach((p) => p.fams.forEach((x) => cnt.set(x, (cnt.get(x) || 0) + 1)));
     const rows = [...cnt].filter(([k]) => v.famInfo.has(k) && (!P().vendor || v.famInfo.get(k).vendor === P().vendor)).sort((a, b) => b[1] - a[1]).slice(0, 18);
@@ -899,10 +953,12 @@
     })), { label: 'Providers offering each GPU', rowH: 22 });
   }
   function drawGen(v, f) {
+    f = { ...f, provs: f.provsAny }; // GPU mix compares models, so the GPU model filter is not applied
     const el = $('#gen');
     const newest = (p) => { let best = null; p.fams.forEach((k) => { const i = v.famInfo.get(k); if (i && (!best || i.year > best.year)) best = i; }); return best; };
-    const g = d3.rollup(f.provs, (a) => a.length, (p) => { const b = newest(p); return b ? `${b.arch}|${b.vendor}|${b.year}` : 'Not specified||0'; });
-    const rows = [...g].map(([k, c]) => { const [arch, vendor, year] = k.split('|'); return { arch, vendor, year: +year, c }; }).sort((a, b) => b.year - a.year || b.c - a.c);
+    const g = d3.rollup(f.provs, (a) => a.length, (p) => { const b = newest(p); return b ? `${b.arch}|${b.vendor}` : 'Not specified|'; });
+    const yr = new Map(); v.famInfo.forEach((i) => { const k = `${i.arch}|${i.vendor}`; yr.set(k, Math.max(yr.get(k) || 0, i.year || 0)); });
+    const rows = [...g].map(([k, c]) => { const [arch, vendor] = k.split('|'); return { arch, vendor, year: yr.get(k) || 0, c }; }).sort((a, b) => b.year - a.year || b.c - a.c);
     if (!rows.length) { emptyNote(el, 'No providers match these filters.'); return; }
     hbars(el, rows.map((r) => ({
       label: r.vendor ? `${r.arch} (${r.vendor})` : r.arch, value: r.c, text: fInt(r.c), color: r.vendor ? vColor(r.vendor) : MUTED,
@@ -910,6 +966,7 @@
     })), { label: 'Providers by newest GPU generation', rowH: 22 });
   }
   function drawHeat(v, f) {
+    f = { ...f, provs: f.provsAny }; // GPU mix compares models, so the GPU model filter is not applied
     const el = $('#heat'); const fam = focus();
     const regs = d3.groups(f.provs.filter((p) => p.region !== 'Unknown'), (p) => p.region).map(([r, a]) => ({ r, a, n: a.length })).sort((a, b) => b.n - a.n);
     const cnt = new Map(); f.provs.forEach((p) => p.fams.forEach((x) => cnt.set(x, (cnt.get(x) || 0) + 1)));
@@ -980,7 +1037,7 @@
         [p.cities.length ? p.cities.slice(0, 2).join(', ') + (p.cities.length > 2 ? ` +${p.cities.length - 2}` : '') : '—', 'hide-narrow city']];
       cells.forEach(([t, c], i) => {
         const td = document.createElement('td'); if (c) td.className = c;
-        if (i === 3) { const d = document.createElement('span'); d.className = 'dot'; d.style.background = ownColor(p.ownership); td.append(d, t); } else { td.textContent = t; if (i === 1) withFlag(td, t); if (i === 0) withLogo(td, t, 'sm'); }
+        if (i === 3) { const d = document.createElement('span'); d.className = 'dot'; d.style.background = ownColor(p.ownership); td.append(d, t); } else { td.textContent = t; if (i === 1) { withFlag(td, t); if (p.hq_city) { const sm = document.createElement('small'); sm.className = 'hqc'; sm.textContent = hqPlace(p); td.append(sm); } } if (i === 0) withLogo(td, t, 'sm'); }
         tr.append(td);
       });
       return tr;
@@ -1021,7 +1078,7 @@
     const head = document.createElement('div'); head.className = 'gx-dhead';
     const h = document.createElement('h3'); h.textContent = p.provider; withLogo(h, p.provider, 'lg');
     const right = document.createElement('div'); right.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;align-items:center';
-    [p.hq, p.category, (OWN.find((o) => o[0] === p.ownership) || [0, p.ownership])[1]].forEach((t, i) => { const s = document.createElement('span'); s.className = 'pill'; s.textContent = t; if (i === 0) withFlag(s, t); right.append(s); });
+    [p.hq, p.category, (OWN.find((o) => o[0] === p.ownership) || [0, p.ownership])[1]].forEach((t, i) => { const s = document.createElement('span'); s.className = 'pill'; s.textContent = i === 0 ? hqPlace(p, true) : t; if (i === 0) { withFlag(s, p.hq); s.title = 'Headquarters'; } right.append(s); });
     if (/^https?:\/\//.test(String(p.website))) { const a = document.createElement('a'); a.href = p.website; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Website ↗'; a.className = 'gx-chip'; right.append(a); }
     const x = document.createElement('button'); x.type = 'button'; x.className = 'gx-btn'; x.textContent = 'Close'; x.onclick = () => set({ sel: null }); right.append(x);
     head.append(h, right);
@@ -1101,6 +1158,7 @@
     ]);
   }
   function insHardware(v, f) {
+    f = { ...f, provs: f.provsAny }; // GPU mix compares models, so the GPU model filter is not applied
     const n = f.provs.length || 1;
     const cnt = new Map(); f.provs.forEach((p) => p.fams.forEach((x) => cnt.set(x, (cnt.get(x) || 0) + 1)));
     const top = [...cnt].sort((a, b) => b[1] - a[1])[0];

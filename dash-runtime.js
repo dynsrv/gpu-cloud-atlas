@@ -1,6 +1,6 @@
 /* Standalone stand-in for the dashboard host: loads the datasets, keeps filter state in the URL. */
 (function () {
-  const DEFAULTS = { category: null, country: null, dir: 'desc', family: 'H100', metric: 'providers', ownership: null, pgroup: 'region', q: null, region: null, sel: null, sort: 'op_mw', tab: 'overview' };
+  const DEFAULTS = { category: null, country: null, dir: 'desc', family: null, metric: 'providers', ownership: null, pgroup: 'region', q: null, region: null, sel: null, sort: 'op_mw', tab: 'overview' };
   const SETS = ['providers', 'prices', 'gpu_families', 'countries', 'world_map', 'dc_cities', 'flags', 'logos'];
   const store = {}; SETS.forEach((id) => { store[id] = { status: 'loading', data: null }; });
   const subs = [];

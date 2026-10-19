@@ -700,3 +700,21 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   #cheap td{padding:9px 8px}
   #cheap td.terms{white-space:normal}
 }
+
+/* chip finder (linked to Chip / GPU filters) */
+.gx-chipbox{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border:1px solid var(--color-border-line);border-radius:var(--r-md);background:var(--color-bg-subtle,var(--color-bg));margin-bottom:10px}
+.gx-chipbox .chl{display:flex;align-items:center;gap:6px;font-size:var(--t-xs);font-weight:600;color:var(--color-fg-muted)}
+.gx-chipbox .chl .i{width:14px;height:14px}
+.gx-chipbox .chr{display:flex;flex-wrap:wrap;gap:6px}
+.gx-chipbox .chr button{font:inherit;font-size:12px;font-weight:600;padding:5px 10px;border-radius:999px;border:1px solid var(--color-border-line);background:var(--color-bg);color:var(--color-fg);cursor:pointer;transition:border-color .15s,background .15s}
+.gx-chipbox .chr button:hover{border-color:var(--gx-gblue);color:var(--gx-gblue)}
+.gx-chipbox.on{border-color:color-mix(in srgb,var(--gx-gblue) 45%,transparent);background:color-mix(in srgb,var(--gx-gblue) 7%,var(--color-bg))}
+.gx-chipbox .cht{display:flex;align-items:center;gap:8px}
+.gx-chipbox .cht span{font-size:var(--t-xs);color:var(--color-fg-muted);font-weight:600}
+.gx-chipbox .cht b{font-size:15px;color:var(--gx-gblue)}
+.gx-chipbox .chx{margin-left:auto;display:inline-grid;place-items:center;width:26px;height:26px;border-radius:var(--r-sm);border:1px solid var(--color-border-line);background:var(--color-bg);color:var(--color-fg-muted);cursor:pointer}
+.gx-chipbox .chx .i{width:13px;height:13px}
+.gx-chipbox .chs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.gx-chipbox .chs span{display:flex;flex-direction:column;font-size:11px;color:var(--color-fg-muted);background:var(--color-bg);border-radius:var(--r-sm);padding:6px 8px;border:1px solid var(--color-border-line)}
+.gx-chipbox .chs strong{font-size:16px;color:var(--color-fg);font-variant-numeric:tabular-nums}
+#dir td small.hqc{display:block;font-size:11px;color:var(--color-fg-muted);font-weight:400;margin-top:1px}
