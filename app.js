@@ -619,8 +619,30 @@
     document.querySelectorAll('#ex-mode button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.ex === mode)));
     $('#ex-sortlab').hidden = mode !== 'providers'; $('#ex-sort').value = q.psort || 'op';
     // region quick filter
-    const regs = [...new Set(v.provs.map((p) => p.region))].filter((r) => r && r !== 'Unknown').sort();
-    $('#ex-regions').replaceChildren(...[null, ...regs].map((r) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = r || 'All regions'; b.setAttribute('aria-pressed', String((q.region || null) === r)); b.onclick = () => set({ region: r, country: null, city: null }); return b; }));
+    // region tiles: providers per HQ region (other filters applied), tap to zoom + filter
+    const regN = d3.rollup(f.provsLoc.filter((p) => p.region && p.region !== 'Unknown'), (a) => ({ n: a.length, op: d3.sum(a, (p) => p.op || 0) }), (p) => p.region);
+    const regs = [...regN.keys()].sort((a, b) => regN.get(b).n - regN.get(a).n);
+    const rmax = d3.max(regs, (r) => regN.get(r).n) || 1;
+    const RI = { 'North America': 'NA', Europe: 'EU', 'Asia Pacific': 'APAC', 'Middle East': 'ME', 'Latin America': 'LATAM', Africa: 'AF' };
+    const rh = document.createElement('div'); rh.className = 'rgh';
+    const rt = document.createElement('span'); rt.textContent = 'HQ region';
+    const clr = document.createElement('button'); clr.type = 'button'; clr.className = 'rgclr'; clr.textContent = q.region ? `Clear ${q.region}` : 'All regions'; clr.disabled = !q.region; clr.onclick = () => set({ region: null, country: null, city: null });
+    rh.append(rt, clr);
+    const grid = document.createElement('div'); grid.className = 'rgg';
+    regs.forEach((r) => {
+      const d = regN.get(r); const on = q.region === r;
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'rgt' + (on ? ' on' : ''); b.setAttribute('aria-pressed', String(on));
+      b.setAttribute('aria-label', `${r}: ${d.n} providers${d.op ? ', ' + fMW(d.op) + ' live' : ''}`);
+      const code = document.createElement('span'); code.className = 'rc'; code.textContent = RI[r] || r.slice(0, 2).toUpperCase();
+      const nm = document.createElement('span'); nm.className = 'rn'; nm.textContent = r;
+      const n = document.createElement('strong'); n.textContent = fInt(d.n);
+      const sub = document.createElement('small'); sub.textContent = d.op ? `${fMW(d.op)} live` : 'MW not disclosed';
+      const bar = document.createElement('i'); bar.style.setProperty('--w', (100 * d.n / rmax) + '%');
+      b.append(code, nm, n, sub, bar);
+      b.onclick = () => set({ region: on ? null : r, country: null, city: null });
+      grid.append(b);
+    });
+    $('#ex-regions').replaceChildren(rh, grid);
     // providers in view: headquartered here, or running a data center here
     const list = new Map(f.provs.map((p) => [p.provider, { p, hq: true, here: false }]));
     if (q.country || q.region || q.city) {
