@@ -120,7 +120,7 @@
   // search matches the provider name, its HQ country, or any city where it runs a data center
   const match = (p, s) => String(p.provider).toLowerCase().includes(s) || String(p.hq).toLowerCase().includes(s) || String(p.hq_city || '').toLowerCase().includes(s) || p.cities.some((c) => c.toLowerCase().includes(s));
   // "San Jose, California" (city + state/district) when the HQ city is known; else the country
-  const hqPlace = (p, withCountry) => { const c = p.hq_city ? [p.hq_city, p.hq_admin && p.hq_admin !== p.hq_city ? p.hq_admin : null].filter(Boolean).join(', ') : ''; return c ? (withCountry ? `${c}, ${p.hq}` : c) : p.hq; };
+  const hqPlace = (p, withCountry) => { const c = p.hq_city ? [p.hq_city, p.hq_admin && p.hq_admin !== p.hq_city ? p.hq_admin : null].filter(Boolean).join(', ') : ''; return c ? (withCountry && c !== p.hq ? `${c}, ${p.hq}` : c) : p.hq; };
   // selected GPU model (null = all models); a chip maker or GPU model turns on "where to rent it" mode
   const famSel = () => { const x = P().family; return x && x !== '__all' && x !== 'null' ? x : null; };
   const chipOn = () => !!(P().vendor || famSel());
@@ -410,6 +410,26 @@
       .on('click', (e, d) => { if (!pv) set({ city: q.city === d.city ? null : d.city }); })
       .on('mousemove', (e, d) => (pv ? tipShow(e, `${d.city}, ${d.country}`, [['Data center of', pv.provider], ['Headquarters', hqPlace(pv, true)]]) : tipShow(e, `${d.city}, ${d.country}`, [['Providers with a data center here', String(d.n)], ['', trunc(d.provs.slice(0, 8).join(', ') + (d.n > 8 ? ` +${d.n - 8} more` : ''), 220)]])))
       .on('mouseleave', tipHide);
+    // provider HQ points (providers layer): one point per HQ city, tooltip lists each provider's GPUs
+    const hqPts = !pv && m === 'providers' ? d3.groups(f.provs.filter((p) => p.hq_px != null && p.hq_px !== ''), (p) => p.hq_city + '|' + p.hq)
+      .map(([k, a]) => ({ k, city: a[0].hq_city, place: hqPlace(a[0], true), country: a[0].hq, x: +a[0].hq_px, y: +a[0].hq_py, provs: a.sort((x, y) => (y.op || 0) - (x.op || 0) || d3.ascending(x.provider, y.provider)) }))
+      .sort((a, b) => b.provs.length - a.provs.length) : [];
+    const hqR = (d) => Math.min(7, 2.4 + Math.sqrt(d.provs.length) * 1.1);
+    const gpuList = (p) => { const fs = p.fams.filter((k) => v.famInfo.has(k)).sort((a, b) => (v.famInfo.get(b).year - v.famInfo.get(a).year) || d3.ascending(a, b)); return fs.length ? fs : null; };
+    const hqTip = (e, d) => {
+      const F = famSel();
+      const lines = d.provs.length === 1
+        ? (() => { const g = gpuList(d.provs[0]); return [['GPUs offered', g ? trunc(g.join(', '), 260) : 'not specified']]; })()
+        : d.provs.slice(0, 8).map((p) => { const g = gpuList(p); return [p.provider, g ? trunc(g.slice(0, 6).join(', ') + (g.length > 6 ? ` +${g.length - 6}` : ''), 90) : 'GPUs not specified']; })
+          .concat(d.provs.length > 8 ? [['', `+${d.provs.length - 8} more providers headquartered here`]] : []);
+      tipShow(e, d.provs.length === 1 ? `${d.provs[0].provider} · HQ ${d.place}` : `HQ in ${d.place} · ${d.provs.length} providers${F ? ' selling ' + F : ''}`, lines);
+    };
+    const hqDots = g.append('g').attr('class', 'hqpts').selectAll('circle').data(hqPts).join('circle')
+      .attr('cx', (d) => d.x).attr('cy', (d) => d.y)
+      .attr('fill', 'var(--gx-gblue)').attr('fill-opacity', 0.9).attr('stroke', 'var(--color-bg, #fff)')
+      .style('cursor', 'pointer')
+      .on('mousemove', hqTip).on('mouseleave', tipHide)
+      .on('click', (e, d) => { tipHide(); if (d.provs.length === 1) { set({ pv: d.provs[0].provider }); } else set({ country: q.country === d.country ? null : d.country, city: null }); });
     // country names sized to the country's footprint on the map (no outline); shown only where the name fits
     const cxy = new Map(sc.data.map((c) => [c.country, [+c.px, +c.py]]));
     const cLab = [];
@@ -434,6 +454,7 @@
       .attr('class', 'citylab').attr('dominant-baseline', 'central').text((d) => d.city);
     const paint = (k) => {
       dots.attr('r', (d) => rr(d) / Math.sqrt(k)).attr('stroke-width', (d) => (isOn(d) ? 2 : 1) / k);
+      hqDots.attr('r', (d) => hqR(d) / Math.sqrt(k)).attr('stroke-width', 1.2 / k);
       halo.selectAll('circle').attr('r', (d) => (rr(d) * 2.1) / Math.sqrt(k));
       const s = (el.clientWidth || W) / W; // screen pixels per map unit
       // place names biggest-first and skip any that would overlap a name already placed
@@ -504,6 +525,7 @@
     }
     if (sm !== 'price') { const s = document.createElement('span'); const i = document.createElement('i'); i.style.background = 'repeating-linear-gradient(45deg,var(--gx-land) 0 2px,var(--gx-line-strong) 2px 3px)'; s.append(i, sm === 'providers' ? '' : 'Providers, no MW disclosed'); if (sm !== 'providers') lg.append(s); }
     else { const s = document.createElement('span'); const i = document.createElement('i'); i.style.background = 'var(--gx-land)'; s.append(i, 'No price published'); lg.append(s); }
+    if (hqPts.length) { const s = document.createElement('span'); const i = document.createElement('i'); i.style.background = 'var(--gx-gblue)'; i.style.borderRadius = '50%'; s.append(i, 'Provider HQ (hover for GPUs)'); lg.append(s); }
     if (chip) { const s = document.createElement('span'); const i = document.createElement('i'); i.style.background = 'repeating-linear-gradient(45deg,var(--gx-land) 0 2px,var(--gx-line-strong) 2px 3px)'; s.append(i, 'HQ only, no city named'); lg.append(s); }
     if (pts.length) { const s = document.createElement('span'); const i = document.createElement('i'); i.style.background = 'var(--gx-city)'; i.style.borderRadius = '50%'; s.append(i, `Data center cities${q.country ? ' in ' + q.country : ''}, sized by providers present`); lg.append(s); }
     const unk = f.provs.filter((p) => p.hq === 'Unknown').length;
