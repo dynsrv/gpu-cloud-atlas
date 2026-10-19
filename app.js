@@ -740,36 +740,37 @@
       .map(([k, a]) => { const s = a.map((r) => r.usd).sort(d3.ascending); return { k, a, n: a.length, q1: d3.quantileSorted(s, 0.25), med: d3.quantileSorted(s, 0.5), q3: d3.quantileSorted(s, 0.75) }; })
       .sort((a, b) => b.n - a.n).slice(0, 22).sort((a, b) => b.med - a.med);
     if (!groups.length) { emptyNote(el, 'No priced offers match these filters.'); return; }
-    const W = Math.max(300, el.clientWidth || 600), rowH = 26, m = { t: 26, r: 60, b: 6 };
+    const W = Math.max(300, el.clientWidth || 600); const NR = W < 560; const rowH = NR ? 46 : 26, m = { t: 26, r: NR ? 8 : 60, b: 6 }; const cy = NR ? 32 : rowH / 2;
     const H = m.t + m.b + groups.length * rowH;
     const svg = svgFor(el, W, H, 'Price range by GPU model');
-    const maxCh = W < 500 ? 15 : 40; const short = (t) => (t.length > maxCh ? t.slice(0, maxCh - 1) + '…' : t);
+    const maxCh = NR ? 34 : 40; const short = (t) => (t.length > maxCh ? t.slice(0, maxCh - 1) + '…' : t);
     groups.forEach((g) => { g.lab = `${short(g.k)} · ${g.n}`; });
     const labels = groups.map((g) => g.lab);
-    const lw = Math.min(W * 0.34, measure(svg, labels) + 12);
+    const lw = NR ? 8 : Math.min(W * 0.34, measure(svg, labels) + 12);
     const all = groups.flatMap((g) => g.a.map((r) => r.usd));
     const x = d3.scaleLog([Math.max(0.01, d3.min(all) * 0.85), d3.max(all) * 1.15], [lw, W - m.r]);
     const ticks = [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 50].filter((t) => t >= x.domain()[0] && t <= x.domain()[1]);
-    const usable = W - m.r - lw; const tk = usable < 260 ? ticks.filter((t, i) => i % 2 === 0) : ticks;
+    const usable = W - m.r - lw; const tk = NR ? ticks.filter((t) => [0.1, 0.5, 2, 10, 50].includes(t)) : usable < 260 ? ticks.filter((t, i) => i % 2 === 0) : ticks;
     const ax = svg.append('g');
     ax.selectAll('line').data(tk).join('line').attr('x1', x).attr('x2', x).attr('y1', m.t - 6).attr('y2', H - m.b).attr('stroke', 'var(--cds-chart-grid)');
     ax.selectAll('text').data(tk).join('text').attr('x', x).attr('y', m.t - 12).attr('text-anchor', 'middle').attr('class', 'mono').text((t) => '$' + t);
     const g = svg.selectAll('g.row').data(groups).join('g').attr('class', 'row').attr('transform', (d, i) => `translate(0,${m.t + i * rowH})`);
     g.append('rect').attr('x', 0).attr('width', W).attr('height', rowH).attr('fill', (d) => (d.k === fam ? 'var(--color-bg)' : 'transparent')).attr('rx', 4);
-    g.append('text').attr('x', lw - 10).attr('y', rowH / 2).attr('dy', '0.35em').attr('text-anchor', 'end')
-      .attr('class', (d) => (d.k === fam ? 'strong' : null)).style('cursor', 'pointer').text((d) => d.lab)
+    g.append('text').attr('x', NR ? 8 : lw - 10).attr('y', NR ? 13 : rowH / 2).attr('dy', '0.35em').attr('text-anchor', NR ? 'start' : 'end')
+      .attr('class', (d) => (d.k === fam || NR ? 'strong' : null)).style('cursor', 'pointer').text((d) => d.lab)
       .on('click', (e, d) => set({ family: d.k }));
-    g.append('rect').attr('x', (d) => x(d.q1)).attr('width', (d) => Math.max(2, x(d.q3) - x(d.q1))).attr('y', rowH / 2 - 6).attr('height', 12).attr('rx', 4)
+    g.append('rect').attr('x', (d) => x(d.q1)).attr('width', (d) => Math.max(2, x(d.q3) - x(d.q1))).attr('y', cy - 6).attr('height', 12).attr('rx', 4)
       .attr('fill', (d) => (d.k === fam ? C(0) : MUTED)).attr('fill-opacity', 0.28);
     g.each(function (d) {
       d3.select(this).selectAll('circle').data(d.a).join('circle')
-        .attr('cx', (r) => x(r.usd)).attr('cy', (r, i) => rowH / 2 + (((i * 7919) % 13) / 13 - 0.5) * rowH * 0.55).attr('r', 2.6)
+        .attr('cx', (r) => x(r.usd)).attr('cy', (r, i) => cy + (((i * 7919) % 13) / 13 - 0.5) * (NR ? 14 : rowH * 0.55)).attr('r', NR ? 2.2 : 2.6)
         .attr('fill', d.k === fam ? C(0) : MUTED).attr('fill-opacity', d.k === fam ? 0.75 : 0.55)
         .on('mousemove', (e, r) => tipShow(e, `${r.provider} · ${r.p ? r.p.hq : r.hq}`, [[trunc(String(r.model), 60), ''], ['Lowest rate', `${f$(r.usd)}/GPU-hr`], ['Pricing', r.basis || '—'], ['As published', trunc(String(r.price_text), 140)]]))
         .on('mouseleave', tipHide);
     });
-    g.append('line').attr('x1', (d) => x(d.med)).attr('x2', (d) => x(d.med)).attr('y1', rowH / 2 - 8).attr('y2', rowH / 2 + 8).attr('stroke', 'var(--color-fg)').attr('stroke-width', 2.5).attr('stroke-linecap', 'round');
-    g.append('text').attr('x', W - m.r + 8).attr('y', rowH / 2).attr('dy', '0.35em').attr('class', 'strong').text((d) => f$(d.med));
+    g.append('line').attr('x1', (d) => x(d.med)).attr('x2', (d) => x(d.med)).attr('y1', cy - 8).attr('y2', cy + 8).attr('stroke', 'var(--color-fg)').attr('stroke-width', 2.5).attr('stroke-linecap', 'round');
+    g.append('text').attr('x', NR ? W - 8 : W - m.r + 8).attr('y', NR ? 13 : rowH / 2).attr('dy', '0.35em').attr('text-anchor', NR ? 'end' : null).attr('class', 'strong').text((d) => (NR ? 'median ' : '') + f$(d.med));
+    if (NR) g.filter((d, i) => i < groups.length - 1).append('line').attr('x1', 8).attr('x2', W - 8).attr('y1', rowH - 0.5).attr('y2', rowH - 0.5).attr('stroke', 'var(--cds-chart-grid)');
     el.classList.add('drawn');
   }
   function drawCheap(f) {
@@ -807,28 +808,29 @@
     legend($('#mw-legend'), [['Operational (live)', C(1)], ['Planned / contracted', C(2), true]]);
     const rows = f.provs.filter((p) => p.op != null || p.pl != null).sort((a, b) => Math.max(b.op || 0, b.pl || 0) - Math.max(a.op || 0, a.pl || 0)).slice(0, 18);
     if (!rows.length) { emptyNote(el, 'No provider in this selection discloses MW capacity.'); return; }
-    const W = Math.max(300, el.clientWidth || 600), rowH = 26, m = { t: 24, r: 8, b: 6 };
+    const W = Math.max(300, el.clientWidth || 600); const NR = W < 560; const rowH = NR ? 46 : 26, m = { t: 24, r: 8, b: 6 }; const cy = NR ? 32 : rowH / 2;
     const H = m.t + m.b + rows.length * rowH;
     const svg = svgFor(el, W, H, 'Operational versus planned capacity by provider');
-    const names = rows.map((p) => trunc(String(p.provider), 26));
-    const lw = Math.min(W * 0.36, measure(svg, names) + 12);
+    const names = rows.map((p) => trunc(String(p.provider), NR ? 30 : 26));
+    const lw = NR ? 10 : Math.min(W * 0.36, measure(svg, names) + 12);
     const vals = rows.flatMap((p) => [p.op, p.pl]).filter((x) => x != null && x > 0);
     const txt = (p) => (p.op != null && p.pl != null ? `${fMW(p.op)} → ${fMW(p.pl)}` : p.op != null ? `${fMW(p.op)} live` : `${fMW(p.pl)} planned`);
-    const vw = measure(svg, rows.map(txt)) + 10;
+    const vw = NR ? 6 : measure(svg, rows.map(txt)) + 10;
     const x = d3.scaleLog([Math.max(0.5, d3.min(vals) * 0.7), d3.max(vals) * 1.25], [lw, W - m.r - vw]);
     const ticks = [1, 10, 100, 1000, 10000, 100000].filter((t) => t >= x.domain()[0] && t <= x.domain()[1]);
     svg.append('g').selectAll('line').data(ticks).join('line').attr('x1', x).attr('x2', x).attr('y1', m.t - 6).attr('y2', H - m.b).attr('stroke', 'var(--cds-chart-grid)');
-    svg.append('g').selectAll('text').data(ticks).join('text').attr('x', x).attr('y', m.t - 12).attr('text-anchor', 'middle').attr('class', 'mono').text((t) => fMW(t));
+    svg.append('g').selectAll('text').data(NR ? ticks.filter((t, i) => i % 2 === 0) : ticks).join('text').attr('x', x).attr('y', m.t - 12).attr('text-anchor', 'middle').attr('class', 'mono').text((t) => fMW(t));
     const g = svg.selectAll('g.row').data(rows).join('g').attr('class', 'row').attr('transform', (d, i) => `translate(0,${m.t + i * rowH})`).style('cursor', 'pointer')
       .on('click', (e, p) => openProfile(p.provider))
       .on('mousemove', (e, p) => tipShow(e, `${p.provider} · ${p.hq}`, [['Live', p.op_mw_text ? trunc(String(p.op_mw_text), 150) : 'not disclosed', C(1)], ['Planned', p.planned_mw_text ? trunc(String(p.planned_mw_text), 150) : 'not disclosed', C(2)]]))
       .on('mouseleave', tipHide);
     g.append('rect').attr('width', W).attr('height', rowH).attr('fill', 'transparent');
-    g.append('text').attr('x', lw - 10).attr('y', rowH / 2).attr('dy', '0.35em').attr('text-anchor', 'end').attr('class', 'strong').text((p, i) => names[i]);
-    g.filter((p) => p.op != null && p.pl != null).append('line').attr('x1', (p) => x(Math.max(p.op, x.domain()[0]))).attr('x2', (p) => x(Math.max(p.pl, x.domain()[0]))).attr('y1', rowH / 2).attr('y2', rowH / 2).attr('stroke', MUTED).attr('stroke-width', 2).attr('stroke-linecap', 'round');
-    g.filter((p) => p.pl != null && p.pl > 0).append('circle').attr('cx', (p) => x(p.pl)).attr('cy', rowH / 2).attr('r', 5).attr('fill', 'var(--color-panel)').attr('stroke', C(2)).attr('stroke-width', 2.2);
-    g.filter((p) => p.op != null && p.op > 0).append('circle').attr('cx', (p) => x(p.op)).attr('cy', rowH / 2).attr('r', 5).attr('fill', C(1));
-    g.append('text').attr('x', (p) => x(Math.max(p.op || 0, p.pl || 0, x.domain()[0])) + 10).attr('y', rowH / 2).attr('dy', '0.35em').text(txt);
+    g.append('text').attr('x', NR ? 10 : lw - 10).attr('y', NR ? 13 : rowH / 2).attr('dy', '0.35em').attr('text-anchor', NR ? 'start' : 'end').attr('class', 'strong').text((p, i) => names[i]);
+    if (NR) g.filter((p, i) => i < rows.length - 1).append('line').attr('x1', 10).attr('x2', W - 8).attr('y1', rowH - 0.5).attr('y2', rowH - 0.5).attr('stroke', 'var(--cds-chart-grid)');
+    g.filter((p) => p.op != null && p.pl != null).append('line').attr('x1', (p) => x(Math.max(p.op, x.domain()[0]))).attr('x2', (p) => x(Math.max(p.pl, x.domain()[0]))).attr('y1', cy).attr('y2', cy).attr('stroke', MUTED).attr('stroke-width', 2).attr('stroke-linecap', 'round');
+    g.filter((p) => p.pl != null && p.pl > 0).append('circle').attr('cx', (p) => x(p.pl)).attr('cy', cy).attr('r', 5).attr('fill', 'var(--color-panel)').attr('stroke', C(2)).attr('stroke-width', 2.2);
+    g.filter((p) => p.op != null && p.op > 0).append('circle').attr('cx', (p) => x(p.op)).attr('cy', cy).attr('r', 5).attr('fill', C(1));
+    g.append('text').attr('x', (p) => (NR ? W - 8 : x(Math.max(p.op || 0, p.pl || 0, x.domain()[0])) + 10)).attr('y', NR ? 13 : rowH / 2).attr('dy', '0.35em').attr('text-anchor', NR ? 'end' : null).text(txt);
     el.classList.add('drawn');
   }
   function drawOwn(f) {
@@ -913,7 +915,25 @@
     const cnt = new Map(); f.provs.forEach((p) => p.fams.forEach((x) => cnt.set(x, (cnt.get(x) || 0) + 1)));
     const cols = [...cnt].filter(([k]) => v.famInfo.has(k) && (!P().vendor || v.famInfo.get(k).vendor === P().vendor)).sort((a, b) => b[1] - a[1]).slice(0, 14).map(([k]) => k);
     if (!regs.length || !cols.length) { emptyNote(el, 'Not enough data for a regional mix.'); return; }
-    const W = Math.max(320, el.clientWidth || 600), ch = 30;
+    const W = Math.max(300, el.clientWidth || 600), ch = 30;
+    if (W < 560) {
+      const RC = { 'North America': 'NA', Europe: 'EU', 'Asia Pacific': 'APAC', 'Middle East': 'ME', 'Latin America': 'LATAM', Africa: 'AF' };
+      const rh = 30, top = 34, lw2 = 104; const cw2 = (W - lw2 - 2) / regs.length;
+      const svg = svgFor(el, W, top + cols.length * rh + 4, 'Share of providers in each region offering each GPU');
+      svg.append('g').selectAll('text').data(regs).join('text').attr('x', (d, i) => lw2 + i * cw2 + cw2 / 2).attr('y', 12).attr('text-anchor', 'middle').attr('class', 'strong').style('font-size', '10.5px').text((d) => RC[d.r] || d.r.slice(0, 4));
+      svg.append('g').selectAll('text').data(regs).join('text').attr('x', (d, i) => lw2 + i * cw2 + cw2 / 2).attr('y', 26).attr('text-anchor', 'middle').attr('class', 'mono').style('font-size', '10px').text((d) => d.n);
+      const rg = svg.selectAll('g.r').data(cols).join('g').attr('transform', (k, i) => `translate(0,${top + i * rh})`).style('cursor', 'pointer').on('click', (e, k) => set({ family: k }));
+      rg.append('text').attr('x', 2).attr('y', rh / 2).attr('dy', '0.35em').attr('class', (k) => (k === fam ? 'strong' : null)).text((k) => trunc(k, 15));
+      rg.each(function (k) {
+        const cells = regs.map((d) => { const c = d.a.filter((p) => p.fams.includes(k)).length; return { c, s: c / d.n }; });
+        const cg = d3.select(this).selectAll('g').data(cells).join('g').attr('transform', (c, i) => `translate(${lw2 + i * cw2},0)`);
+        cg.append('rect').attr('x', 1.5).attr('y', 1.5).attr('width', cw2 - 3).attr('height', rh - 3).attr('rx', 5).attr('fill', 'var(--color-border-line)').attr('fill-opacity', 0.35);
+        cg.append('rect').attr('x', 1.5).attr('y', 1.5).attr('width', cw2 - 3).attr('height', rh - 3).attr('rx', 5).attr('fill', C(0)).attr('fill-opacity', (c) => (c.c ? 0.08 + 0.85 * c.s : 0));
+        cg.append('text').attr('x', cw2 / 2).attr('y', rh / 2).attr('dy', '0.35em').attr('text-anchor', 'middle').style('font-size', '10.5px')
+          .style('fill', (c) => (c.s > 0.5 ? 'var(--color-bg)' : 'var(--color-fg-muted)')).text((c) => (c.c ? Math.round(c.s * 100) + '%' : ''));
+      });
+      return;
+    }
     const svgTmp = svgFor(el, W, 100, 'Regional GPU mix');
     const lw = measure(svgTmp, regs.map((r) => `${r.r} · ${r.n}`)) + 14;
     const cw = (W - lw - 4) / cols.length;
@@ -1096,7 +1116,7 @@
   /* ---------- orchestrate ---------- */
   const CHARTS = ['#map', '#strip', '#pgroup', '#mw', '#own', '#mwc', '#avail', '#gen', '#heat'];
   let jumped = false;
-  dash.onData(() => {
+  const render = () => {
     const core = ['providers', 'prices', 'gpu_families'].map((id) => dash.data(id).status);
     const bad = core.some((s) => s === 'error' || s === 'connect' || s === 'declined' || s === 'missing');
     if (bad || core.some((s) => s !== 'ok')) {
@@ -1119,5 +1139,9 @@
     if (tab === 'hardware') { drawAvail(v, f); drawGen(v, f); drawHeat(v, f); insHardware(v, f); }
     if (tab === 'directory') { drawDir(f); drawDetail(v); }
     if (!jumped) { jumped = true; const h = location.hash.slice(1); if (TABS.includes(h) && h !== tab) set({ tab: h }); }
-  });
+  };
+  dash.onData(render);
+  // redraw charts when the width changes enough to switch layouts (rotation, window resize)
+  let lastW = window.innerWidth, rT;
+  window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(() => { if (Math.abs(window.innerWidth - lastW) > 40) { lastW = window.innerWidth; render(); } }, 200); });
 })();

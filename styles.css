@@ -664,3 +664,39 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 
 .gx[data-tab="overview"] .gx-mbar .gx-msearch{display:none!important}
 .gx[data-tab="overview"] .gx-mbar .gx-ftoggle{flex:1;justify-content:center}
+
+/* ===== phones: directory as cards, tighter chart cards ===== */
+@media (max-width:720px){
+  .gx-ch{flex-direction:column!important;align-items:flex-start!important;gap:var(--s2)!important}
+  .gx-card h3{font-size:var(--t-md)!important}
+  .gx-card .gx-note{font-size:12px}
+  .gx-grid{gap:var(--s3)!important}
+  /* provider directory: one card per provider, sort as chips */
+  #dir{display:block}
+  #dir thead{display:block}
+  #dir thead tr{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:var(--s2) var(--s3);border-bottom:1px solid var(--gx-line)}
+  #dir thead tr::-webkit-scrollbar{display:none}
+  #dir th{display:block!important;position:static;flex:none;border:0;background:transparent}
+  #dir th>button{padding:6px 11px;border:1px solid var(--gx-line);border-radius:999px;font-size:12px;background:var(--color-panel)}
+  #dir th[aria-sort=ascending]>button,#dir th[aria-sort=descending]>button{background:var(--gx-gblue);border-color:var(--gx-gblue);color:var(--gx-gblue-ink)}
+  #dir tbody{display:flex;flex-direction:column;gap:8px;padding:var(--s2) var(--s3) var(--s3)}
+  #dir tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"n n n" "h g p" "h o o";column-gap:14px;row-gap:4px;padding:12px;border:1px solid var(--gx-line);border-radius:var(--r-md);background:var(--color-panel)}
+  #dir tbody tr.on{border-color:var(--gx-gblue);box-shadow:inset 3px 0 0 var(--gx-gblue)}
+  #dir tbody td{display:none;padding:0;border:0}
+  #dir tbody td:nth-child(1){display:block;grid-area:n;font-size:var(--t-md);font-weight:600}
+  #dir tbody td:nth-child(2){display:block;grid-area:h;align-self:center;font-size:12.5px;color:var(--color-fg-muted)}
+  #dir tbody td:nth-child(5){display:block;grid-area:g}
+  #dir tbody td:nth-child(6){display:block;grid-area:p}
+  #dir tbody td:nth-child(7){display:block!important;grid-area:o;text-align:right}
+  #dir tbody td:nth-child(5),#dir tbody td:nth-child(6),#dir tbody td:nth-child(7){font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+  #dir tbody td:nth-child(5)::before{content:"GPUs ";font-weight:400;color:var(--color-fg-muted);font-size:11px}
+  #dir tbody td:nth-child(6)::before{content:"H100 ";font-weight:400;color:var(--color-fg-muted);font-size:11px}
+  #dir tbody td:nth-child(7)::after{content:" MW";font-weight:400;color:var(--color-fg-muted);font-size:11px}
+  #dir tbody td:nth-child(7)::before{content:"Live ";font-weight:400;color:var(--color-fg-muted);font-size:11px}
+  #dir tbody td:nth-child(7):empty,#dir tbody td:nth-child(7):is([data-v="—"]){display:none}
+  .gx-dpanel .gx-dhead{flex-direction:column;align-items:flex-start!important;gap:var(--s2)}
+  .gx-dpanel .gx-detail{grid-template-columns:1fr!important}
+  /* cheapest offers table: shorter rows */
+  #cheap td{padding:9px 8px}
+  #cheap td.terms{white-space:normal}
+}
