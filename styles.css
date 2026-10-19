@@ -842,3 +842,8 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .gx-filters.open #f-reset.is-active{background:color-mix(in srgb,var(--gx-gblue) 12%,var(--color-panel))!important;color:var(--gx-gblue)!important;box-shadow:none}
 
 .gx-f .gx-dd-btn .v,.gx-sort .gx-dd-btn .v{font-size:inherit!important;color:inherit!important;font-weight:inherit!important;line-height:inherit!important;display:inline!important;white-space:nowrap}
+
+/* desktop page margins: comfortable side gutters, content capped on very wide screens */
+@media (min-width:1024px){
+  .gx{box-sizing:border-box;width:100%;max-width:1760px;margin-inline:auto;padding-inline:clamp(24px,4vw,64px)}
+}
