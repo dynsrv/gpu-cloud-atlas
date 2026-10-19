@@ -117,13 +117,15 @@
     cache = { pr, px, fam, cr, v: { famInfo, provs, byName, prices, cities: cr } };
     return cache.v;
   }
+  // search matches the provider name, its HQ country, or any city where it runs a data center
+  const match = (p, s) => String(p.provider).toLowerCase().includes(s) || String(p.hq).toLowerCase().includes(s) || p.cities.some((c) => c.toLowerCase().includes(s));
   function filt(v) {
     const q = P(); const s = String(q.q || '').toLowerCase();
     const provs = v.provs.filter((p) => (!q.region || p.region === q.region) && (!q.category || p.category === q.category) &&
-      (!q.vendor || p.fams.some((k) => (v.famInfo.get(k) || {}).vendor === q.vendor)) && (!q.ownership || p.ownership === q.ownership) && (!q.country || p.hq === q.country) && (!q.city || p.cities.includes(q.city)) && (!s || String(p.provider).toLowerCase().includes(s)));
+      (!q.vendor || p.fams.some((k) => (v.famInfo.get(k) || {}).vendor === q.vendor)) && (!q.ownership || p.ownership === q.ownership) && (!q.country || p.hq === q.country) && (!q.city || p.cities.includes(q.city)) && (!s || match(p, s)));
     const S = new Set(provs);
     // for data center cities, region/country/city describe where the city is, not the provider's HQ
-    const provsLoc = v.provs.filter((p) => (!q.vendor || p.fams.some((k) => (v.famInfo.get(k) || {}).vendor === q.vendor)) && (!q.category || p.category === q.category) && (!q.ownership || p.ownership === q.ownership) && (!s || String(p.provider).toLowerCase().includes(s)));
+    const provsLoc = v.provs.filter((p) => (!q.vendor || p.fams.some((k) => (v.famInfo.get(k) || {}).vendor === q.vendor)) && (!q.category || p.category === q.category) && (!q.ownership || p.ownership === q.ownership) && (!s || match(p, s)));
     return { provs, provsLoc, prices: v.prices.filter((r) => r.p && S.has(r.p)) };
   }
   function provMin(prices, fam) {
@@ -193,7 +195,7 @@
   const qIn = $('#f-q'); let qT;
   qIn.addEventListener('input', () => { clearTimeout(qT); qT = setTimeout(() => set({ q: qIn.value.trim() || null }), 220); });
   $('#f-reset').addEventListener('click', () => { dash.resetParams(); qIn.value = ''; });
-  document.querySelectorAll('#metric button').forEach((b) => b.addEventListener('click', () => set({ metric: b.dataset.m })));
+  document.querySelectorAll('#metric button').forEach((b) => b.addEventListener('click', () => set({ metric: b.dataset.m, pv: null })));
   $('#metric').addEventListener('keydown', (e) => {
     if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
     const bs = [...document.querySelectorAll('#metric button')]; const i = bs.indexOf(document.activeElement); if (i < 0) return;
@@ -235,6 +237,7 @@
     const chips = $('#f-chips'); const list = [];
     if (q.city) list.push(['Data center in ' + q.city, { city: null }]);
     if (q.sel) list.push(['Profile: ' + q.sel, { sel: null }]);
+    if (q.pv) list.push(['On map: ' + q.pv, { pv: null }]);
     chips.hidden = !list.length;
     chips.replaceChildren(...list.map(([t, clr]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'gx-chip'; b.textContent = t + '  ×'; b.setAttribute('aria-label', 'Clear ' + t); b.onclick = () => set(clr); return b; }));
     document.querySelectorAll('#metric button').forEach((b) => { const on = (q.metric || 'providers') === b.dataset.m; b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1; });
@@ -298,7 +301,7 @@
   function metricOf(a, m) { return m === 'op' ? a.op : m === 'pl' ? a.pl : m === 'price' ? a.pn : a.n; }
   const MERC = { k: 960 / (2 * Math.PI), y0: 372.2 };
   const mercY = (lat) => MERC.y0 - MERC.k * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
-  let zoomT = null; let lastCountry;
+  let zoomT = null; let lastCountry; let lastPv = null; let lastRegion = null;
   const MKf = () => ({ providers: 'var(--gx-pv6)', op: 'var(--gx-lv6)', pl: 'var(--gx-pl6)', cities: 'var(--gx-city)', price: 'var(--gx-pr3)' });
   let MK = {};
   function drawMap(v, f) {
@@ -310,6 +313,12 @@
     const q = P(); const m = q.metric || 'providers'; const fam = focus();
     const agg = countryAgg(f);
     const W = 960, H = 553;
+    // provider focus: its headquarters plus every data center city it names
+    const pv = q.pv ? v.byName.get(q.pv) : null;
+    const cxy0 = new Map(sc.data.map((c) => [c.country, [+c.px, +c.py]]));
+    const pvCities = pv ? [...new Map(v.cities.filter((r) => r.provider === pv.provider).map((r) => [r.city + '|' + r.country, { city: r.city, country: r.country, px: +r.px, py: +r.py, n: 1, provs: [pv.provider] }])).values()] : [];
+    const pvCountries = new Set(pvCities.map((c) => c.country));
+    const hqXY = pv ? cxy0.get(pv.hq) : null;
     const svg = svgFor(el, W, H, 'World map of GPU providers and data center cities');
     const defs = svg.append('defs');
     defs.append('clipPath').attr('id', 'gx-map-clip').append('rect').attr('width', W).attr('height', H).attr('rx', 12);
@@ -355,8 +364,8 @@
     g.append('g').selectAll('path').data(sw.data).join('path')
       .attr('d', (d) => d.d)
       .attr('class', (d) => 'cpath' + (agg.has(d.country) ? ' has' : ''))
-      .attr('fill', (d) => { if (q.country === d.country) return 'var(--gx-sel)'; const a = agg.get(d.country); if (!a) return 'var(--gx-land)'; return hasVal(a) ? shade(cval(a)) : 'url(#gx-hatch)'; })
-      .attr('fill-opacity', (d) => (q.country && q.country !== d.country ? 0.45 : 1))
+      .attr('fill', (d) => { if (pv) return d.country === pv.hq ? 'var(--gx-sel)' : pvCountries.has(d.country) ? 'var(--gx-hov)' : 'var(--gx-land)'; if (q.country === d.country) return 'var(--gx-sel)'; const a = agg.get(d.country); if (!a) return 'var(--gx-land)'; return hasVal(a) ? shade(cval(a)) : 'url(#gx-hatch)'; })
+      .attr('fill-opacity', (d) => (!pv && q.country && q.country !== d.country ? 0.45 : 1))
       .attr('stroke', 'var(--gx-border)').attr('stroke-opacity', 0.45).attr('stroke-width', 0.35).attr('vector-effect', 'non-scaling-stroke')
       .style('cursor', (d) => (agg.has(d.country) ? 'pointer' : null))
       .on('mousemove', countryTip).on('mouseleave', tipHide)
@@ -365,20 +374,26 @@
 
     // circles only for cities
     // city circles belong to layers about physical infrastructure: cities, live power, planned power
-    const showCities = ['cities', 'op', 'pl'].includes(m);
-    const pts = showCities ? cityAgg(v, f).sort((a, b) => b.n - a.n) : [];
+    const showCities = !!pv || ['cities', 'op', 'pl'].includes(m);
+    const pts = pv ? pvCities : showCities ? cityAgg(v, f).sort((a, b) => b.n - a.n) : [];
     const rS = d3.scaleSqrt([0, d3.max(pts, (c) => c.n) || 1], [0, m === 'cities' ? 15 : 12]);
-    const rr = (d) => Math.max(m === 'cities' ? 2.6 : 2.2, rS(d.n));
+    const rr = (d) => (pv ? 4.6 : Math.max(m === 'cities' ? 2.6 : 2.2, rS(d.n)));
     const isOn = (d) => q.city === d.city;
     const halo = g.append('g').attr('pointer-events', 'none');
-    halo.selectAll('circle').data(m === 'cities' || q.country ? pts.slice(0, 12) : []).join('circle').attr('cx', (d) => d.px).attr('cy', (d) => d.py).attr('fill', 'url(#gx-glow)');
+    const routes = g.append('g').attr('pointer-events', 'none');
+    if (pv && hqXY) {
+      routes.selectAll('path').data(pvCities).join('path')
+        .attr('d', (d) => { const [x0, y0] = hqXY; const x1 = d.px, y1 = d.py; const mx = (x0 + x1) / 2, my = (y0 + y1) / 2 - Math.hypot(x1 - x0, y1 - y0) * 0.22; return `M${x0},${y0}Q${mx},${my} ${x1},${y1}`; })
+        .attr('fill', 'none').attr('stroke', 'var(--gx-gblue)').attr('stroke-width', 1.4).attr('stroke-opacity', 0.7).attr('stroke-dasharray', '4 3').attr('vector-effect', 'non-scaling-stroke');
+    }
+    halo.selectAll('circle').data(pv ? pts : m === 'cities' || q.country ? pts.slice(0, 12) : []).join('circle').attr('cx', (d) => d.px).attr('cy', (d) => d.py).attr('fill', 'url(#gx-glow)');
     const dots = g.append('g').selectAll('circle').data(pts).join('circle')
       .attr('cx', (d) => d.px).attr('cy', (d) => d.py)
       .attr('fill', 'var(--gx-city)').attr('fill-opacity', m === 'cities' ? 0.92 : 0.8)
       .attr('stroke', (d) => (isOn(d) ? 'var(--color-fg)' : 'var(--gx-border)'))
       .style('cursor', 'pointer')
-      .on('click', (e, d) => set({ city: q.city === d.city ? null : d.city }))
-      .on('mousemove', (e, d) => tipShow(e, `${d.city}, ${d.country}`, [['Providers with a data center here', String(d.n)], ['', trunc(d.provs.slice(0, 8).join(', ') + (d.n > 8 ? ` +${d.n - 8} more` : ''), 220)]]))
+      .on('click', (e, d) => { if (!pv) set({ city: q.city === d.city ? null : d.city }); })
+      .on('mousemove', (e, d) => (pv ? tipShow(e, `${d.city}, ${d.country}`, [['Data center of', pv.provider], ['Headquarters', pv.hq]]) : tipShow(e, `${d.city}, ${d.country}`, [['Providers with a data center here', String(d.n)], ['', trunc(d.provs.slice(0, 8).join(', ') + (d.n > 8 ? ` +${d.n - 8} more` : ''), 220)]])))
       .on('mouseleave', tipHide);
     // country names sized to the country's footprint on the map (no outline); shown only where the name fits
     const cxy = new Map(sc.data.map((c) => [c.country, [+c.px, +c.py]]));
@@ -392,8 +407,15 @@
     });
     const clab = g.append('g').attr('pointer-events', 'none').selectAll('text').data(cLab).join('text')
       .attr('class', 'ctrylab').attr('x', (d) => d.x).attr('y', (d) => d.y).attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
-      .style('opacity', m === 'cities' ? 0.6 : 1).text((d) => d.t);
-    const lab = g.append('g').attr('pointer-events', 'none').selectAll('text').data(showCities ? pts.slice(0, m === 'cities' || q.country ? 12 : 0) : []).join('text')
+      .style('opacity', pv ? 0.45 : m === 'cities' ? 0.6 : 1).text((d) => d.t);
+    if (pv) clab.filter((d) => d.t === pv.hq).remove();
+    const hqm = g.append('g').attr('pointer-events', 'none');
+    if (pv && hqXY) {
+      hqm.append('circle').attr('class', 'hqring').attr('cx', hqXY[0]).attr('cy', hqXY[1]).attr('fill', 'none').attr('stroke', 'var(--gx-gblue)');
+      hqm.append('circle').attr('class', 'hqdot').attr('cx', hqXY[0]).attr('cy', hqXY[1]).attr('fill', 'var(--gx-gblue)').attr('stroke', '#fff');
+      hqm.append('text').attr('class', 'hqlab').attr('x', hqXY[0]).attr('y', hqXY[1]).attr('text-anchor', 'middle').text('HQ · ' + pv.hq);
+    }
+    const lab = g.append('g').attr('pointer-events', 'none').selectAll('text').data(showCities ? pts.slice(0, pv ? 40 : m === 'cities' || q.country ? 12 : 0) : []).join('text')
       .attr('class', 'citylab').attr('dominant-baseline', 'central').text((d) => d.city);
     const paint = (k) => {
       dots.attr('r', (d) => rr(d) / Math.sqrt(k)).attr('stroke-width', (d) => (isOn(d) ? 2 : 1) / k);
@@ -403,7 +425,11 @@
       const placed = [];
       const boxOf = (x, y, w, hgt) => [x - w / 2, y - hgt / 2, x + w / 2, y + hgt / 2];
       const hit = (b) => placed.some((p) => b[0] < p[2] && b[2] > p[0] && b[1] < p[3] && b[3] > p[1]);
-      lab.each((d) => { const w = (d.city.length * 10.5 * 0.56) / (s * k), hh = 13 / (s * k), x0 = d.px + rr(d) / Math.sqrt(k) + 3 / k; placed.push([x0, d.py - hh / 2, x0 + w, d.py + hh / 2]); });
+      // city names: biggest first, skip any that would collide with a name (or the HQ tag) already placed
+      if (pv && hqXY) { const hw = ((pv.hq.length + 5) * 11 * 0.6) / (s * k), hh2 = 15 / (s * k), hy = hqXY[1] - 16 / Math.sqrt(k); placed.push([hqXY[0] - hw / 2, hy - hh2 / 2, hqXY[0] + hw / 2, hy + hh2 / 2]); }
+      const cityShow = new Set();
+      lab.each((d) => { const w = (d.city.length * 10.5 * 0.56) / (s * k), hh = 13 / (s * k), x0 = d.px + rr(d) / Math.sqrt(k) + 3 / k; const bx = [x0, d.py - hh / 2, x0 + w, d.py + hh / 2]; if (hit(bx)) return; placed.push(bx); cityShow.add(d); });
+      lab.style('display', (d) => (cityShow.has(d) ? null : 'none'));
       const show = new Set();
       cLab.slice().sort((a, b) => b.px - a.px || b.bw - a.bw).forEach((d) => {
         if (d.bw * s * k < d.tw * 1.05) return;
@@ -411,17 +437,25 @@
         if (hit(b)) return; placed.push(b); show.add(d);
       });
       clab.style('font-size', (d) => `${d.px / (s * k)}px`).style('display', (d) => (show.has(d) ? null : 'none'));
+      hqm.select('.hqdot').attr('r', 6 / Math.sqrt(k)).attr('stroke-width', 2 / k);
+      hqm.select('.hqring').attr('r', 12 / Math.sqrt(k)).attr('stroke-width', 1.5 / k);
+      hqm.select('.hqlab').attr('dy', -16 / Math.sqrt(k)).style('font-size', `${11 / (s * k)}px`);
       lab.attr('x', (d) => d.px + rr(d) / Math.sqrt(k) + 3 / k).attr('y', (d) => d.py).style('font-size', `${10.5 / (s * k)}px`);
     };
     const zoom = d3.zoom().scaleExtent([1, 10]).translateExtent([[0, 0], [W, H]]).extent([[0, 0], [W, H]])
       .filter((e) => (e.type === 'wheel' ? e.ctrlKey || e.metaKey : e.type && e.type.startsWith('touch') ? e.touches.length >= 2 : !e.button)) // one finger scrolls the page; two fingers pinch the map
       .on('zoom', (e) => { zoomT = e.transform; g.attr('transform', e.transform); paint(e.transform.k); });
     svg.call(zoom).on('dblclick.zoom', null);
-    if (q.country !== lastCountry) {
-      lastCountry = q.country;
-      const node = g.selectAll('path').filter((d) => d && d.country === q.country).node();
+    if (q.country !== lastCountry || (q.pv || null) !== lastPv || (q.region || null) !== lastRegion) {
+      lastCountry = q.country; lastPv = q.pv || null; lastRegion = q.region || null;
+      const node = g.selectAll('path').filter((d) => d && d.country === (pv ? pv.hq : q.country)).node();
       let tr = d3.zoomIdentity;
-      if (node) {
+      const xy = pv ? [hqXY, ...pvCities.map((c) => [c.px, c.py])].filter(Boolean) : !q.country && q.region ? [...agg.keys()].map((c) => cxy0.get(c)).filter(Boolean) : [];
+      if (xy.length > 1) {
+        const x0 = d3.min(xy, (p) => p[0]), x1 = d3.max(xy, (p) => p[0]), y0 = d3.min(xy, (p) => p[1]), y1 = d3.max(xy, (p) => p[1]);
+        const bw = Math.max(60, x1 - x0), bh = Math.max(40, y1 - y0); const k = Math.max(1, Math.min(7, 0.78 / Math.max(bw / W, bh / H)));
+        tr = d3.zoomIdentity.translate(W / 2 - k * (x0 + x1) / 2, H / 2 - k * (y0 + y1) / 2).scale(k);
+      } else if (node) {
         const b = node.getBBox(); const k = Math.max(1, Math.min(8, 0.75 / Math.max(b.width / W, b.height / H)));
         tr = d3.zoomIdentity.translate(W / 2 - k * (b.x + b.width / 2), H / 2 - k * (b.y + b.height / 2)).scale(k);
       }
@@ -462,6 +496,13 @@
       ? `${fc} of ${f.provs.length} providers name at least one city; the rest list only countries or regions. Ctrl/⌘ + scroll or the buttons to zoom.`
       : (unk ? `${unk} provider${unk > 1 ? 's' : ''} without a stated HQ ${unk > 1 ? 'are' : 'is'} not on the map. ` : '') +
         (m === 'op' || m === 'pl' ? 'Only providers that publish an MW figure count. ' : m === 'price' ? `Color is the median of each provider's lowest ${fam} rate. ` : '') + 'Ctrl/⌘ + scroll to zoom.';
+    document.querySelector('#map-card').classList.toggle('pv-on', !!pv);
+    if (pv) {
+      $('#map-title').textContent = `${pv.provider}: headquarters and data centers`;
+      $('#map-note').textContent = pvCities.length ? `Headquartered in ${pv.hq}. ${pvCities.length} data center ${pvCities.length === 1 ? 'city' : 'cities'} named in ${pvCountries.size} ${pvCountries.size === 1 ? 'country' : 'countries'}. Pick a map layer to go back to the overview.` : `Headquartered in ${pv.hq}. This provider doesn't name specific data center cities.`;
+      const it = (bg, txt, round, line) => { const s = document.createElement('span'); const i = document.createElement('i'); i.style.background = bg; if (round) i.style.borderRadius = '50%'; if (line) { i.style.height = '0'; i.style.borderTop = '2px dashed var(--gx-gblue)'; i.style.background = 'none'; i.style.width = '18px'; } s.append(i, txt); return s; };
+      lg.replaceChildren(it('var(--gx-gblue)', 'Headquarters', true), it('var(--gx-city)', 'Data center city', true), it('', 'Route from HQ', false, true), it('var(--gx-hov)', 'Countries with its data centers'));
+    }
   }
   function drawRank(v, f) {
     MK = MKf();
@@ -502,8 +543,6 @@
 
   /* ---------- providers in view ---------- */
   let plistAll = false;
-  document.querySelectorAll('#plist-sort button').forEach((b) => b.addEventListener('click', () => set({ psort: b.dataset.ps })));
-  $('#plist-more').addEventListener('click', () => { plistAll = !plistAll; set({ _redraw: Date.now() }); });
   function drawPlist(v, f) {
     const q = P(); const fam = focus(); const ps = q.psort || 'op';
     document.querySelectorAll('#plist-sort button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.ps === ps)));
@@ -548,6 +587,129 @@
       const ct = document.createElement('span'); ct.className = 'cities'; ct.textContent = p.cities.length ? 'Data centers: ' + p.cities.slice(0, 4).join(', ') + (p.cities.length > 4 ? ` +${p.cities.length - 4}` : '') : 'No data center cities named';
       b.append(pn, st, ct); return b;
     }));
+  }
+
+  /* ---------- explorer: provider / country / city list beside the map ---------- */
+  let exAll = false; let exT;
+  const exQ = $('#ex-q');
+  exQ.addEventListener('input', () => { clearTimeout(exT); exT = setTimeout(() => set({ q: exQ.value.trim() || null }), 220); });
+  document.querySelectorAll('#ex-mode button').forEach((b) => b.addEventListener('click', () => { exAll = false; const cur = P().metric || 'providers'; set({ ex: b.dataset.ex, metric: b.dataset.ex === 'cities' ? 'cities' : cur === 'cities' ? 'providers' : cur, pv: b.dataset.ex === 'providers' ? P().pv : null }); }));
+  $('#ex-sort').addEventListener('change', (e) => set({ psort: e.target.value }));
+  $('#ex-more').addEventListener('click', () => { exAll = !exAll; set({ _redraw: Date.now() }); });
+  const showMap = () => { if (phone.matches) { const c = $('#map-card'); const y = c.getBoundingClientRect().top + window.scrollY - 70; if (Math.abs(window.scrollY - y) > 80) window.scrollTo({ top: y, behavior: 'smooth' }); } };
+  function exItem({ on, onClick, lead, title, sub, val, valSub, bar, color, label }) {
+    const li = document.createElement('li');
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'gx-xr' + (on ? ' on' : ''); b.setAttribute('aria-pressed', String(!!on)); if (label) b.setAttribute('aria-label', label);
+    b.onclick = onClick;
+    const main = document.createElement('span'); main.className = 'm';
+    const t = document.createElement('b'); t.textContent = title; main.append(t);
+    if (sub) { const s2 = document.createElement('span'); s2.className = 's'; if (typeof sub === 'string') s2.textContent = sub; else s2.append(...sub); main.append(s2); }
+    const r = document.createElement('span'); r.className = 'r';
+    if (val != null) { const vv = document.createElement('strong'); vv.textContent = val; r.append(vv); }
+    if (valSub) { const vs = document.createElement('small'); vs.textContent = valSub; r.append(vs); }
+    b.append(lead, main, r);
+    if (bar != null) { const br = document.createElement('span'); br.className = 'bar'; const i = document.createElement('i'); i.style.width = Math.max(2, bar * 100) + '%'; if (color) i.style.background = color; br.append(i); b.append(br); }
+    li.append(b); return li;
+  }
+  const flagLead = (country) => { const s = document.createElement('span'); s.className = 'lead fl'; const fl = flag(country); if (fl) s.append(fl); else { s.textContent = String(country || '?').slice(0, 2).toUpperCase(); } return s; };
+  function drawExplorer(v, f) {
+    MK = MKf();
+    const q = P(); const mode = ['providers', 'countries', 'cities'].includes(q.ex) ? q.ex : 'providers'; const fam = focus();
+    if (exQ !== document.activeElement) exQ.value = q.q || '';
+    document.querySelectorAll('#ex-mode button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.ex === mode)));
+    $('#ex-sortlab').hidden = mode !== 'providers'; $('#ex-sort').value = q.psort || 'op';
+    // region quick filter
+    const regs = [...new Set(v.provs.map((p) => p.region))].filter((r) => r && r !== 'Unknown').sort();
+    $('#ex-regions').replaceChildren(...[null, ...regs].map((r) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = r || 'All regions'; b.setAttribute('aria-pressed', String((q.region || null) === r)); b.onclick = () => set({ region: r, country: null, city: null }); return b; }));
+    // providers in view: headquartered here, or running a data center here
+    const list = new Map(f.provs.map((p) => [p.provider, { p, hq: true, here: false }]));
+    if (q.country || q.region || q.city) {
+      const loc = new Set(f.provsLoc.map((p) => p.provider));
+      v.cities.forEach((r) => {
+        if (!loc.has(r.provider) || (q.country && r.country !== q.country) || (q.region && r.region !== q.region) || (q.city && r.city !== q.city)) return;
+        const e = list.get(r.provider); if (e) e.here = true; else list.set(r.provider, { p: v.byName.get(r.provider), hq: false, here: true });
+      });
+    }
+    const best = new Map(provMin(v.prices, fam).map((r) => [r.provider, r]));
+    const agg = countryAgg(f); const cities = cityAgg(v, f);
+    const nP = [...list.values()].filter((e) => e.p).length;
+    document.querySelector('[data-exn="providers"]').textContent = fInt(nP);
+    document.querySelector('[data-exn="countries"]').textContent = fInt(agg.size);
+    document.querySelector('[data-exn="cities"]').textContent = fInt(cities.length);
+    const where = q.city || q.country || q.region;
+    $('#ex-count').textContent = where ? `in ${where}` : '';
+    const el = $('#ex-list'); let items = []; let hint = '';
+    if (mode === 'providers') {
+      const ps = q.psort || 'op';
+      let rows = [...list.values()].filter((e) => e.p);
+      const key = { op: (e) => -(e.p.op || 0), price: (e) => (best.get(e.p.provider) ? best.get(e.p.provider).usd : 1e9), cities: (e) => -e.p.ncity, name: () => 0 }[ps];
+      rows.sort((a, b) => key(a) - key(b) || d3.ascending(a.p.provider, b.p.provider));
+      if (q.pv) { const i = rows.findIndex((e) => e.p.provider === q.pv); if (i > 0) rows.unshift(rows.splice(i, 1)[0]); }
+      hint = 'Tap a provider to map its HQ and data centers';
+      items = rows.map((e) => {
+        const p = e.p; const br = best.get(p.provider);
+        const fl = flag(p.hq); const hqS = document.createElement('span'); hqS.className = 'hqs'; if (fl) hqS.append(fl); hqS.append(p.hq);
+        const sub = [hqS, document.createTextNode(` · ${p.ncity ? p.ncity + (p.ncity === 1 ? ' city' : ' cities') : 'no cities named'}`)];
+        if (where && !q.city && !e.hq) sub.push(Object.assign(document.createElement('em'), { className: 'here', textContent: 'DC here' }));
+        const val = ps === 'price' ? (br ? f$(br.usd) : '—') : ps === 'cities' ? String(p.ncity) : ps === 'name' ? (p.op != null ? fMW(p.op) : '') : p.op != null ? fMW(p.op) : '—';
+        const valSub = ps === 'price' ? (br ? `${fam} ${TERM_SHORT[br.basis] || ''}` : fam) : ps === 'cities' ? 'cities' : p.op != null ? 'live' : '';
+        const lead = document.createElement('span'); lead.className = 'lead'; lead.append(logo(p.provider, 'lg'));
+        return exItem({ on: q.pv === p.provider, lead, title: p.provider, sub, val, valSub, label: `${p.provider}, headquartered in ${p.hq}. Show on map`,
+          onClick: () => { set({ pv: q.pv === p.provider ? null : p.provider }); if (q.pv !== p.provider) showMap(); } });
+      });
+    } else if (mode === 'countries') {
+      const m = q.metric || 'providers'; const mm = m === 'cities' ? 'providers' : m;
+      let rows = [...agg].map(([c, a]) => ({ c, a }));
+      const val = (r) => (mm === 'price' ? r.a.med : metricOf(r.a, mm));
+      rows = rows.filter((r) => val(r) != null && val(r) > 0);
+      rows.sort((x, y) => (mm === 'price' ? val(x) - val(y) : val(y) - val(x)) || d3.ascending(x.c, y.c));
+      const mx = d3.max(rows, val) || 1;
+      const dcBy = d3.rollup(cities, (a) => a.length, (c) => c.country);
+      hint = { providers: 'HQ countries by number of providers', op: 'HQ countries by live power', pl: 'HQ countries by planned power', price: `HQ countries by median ${fam} price` }[mm] + ' · tap to filter';
+      items = rows.map((r) => exItem({ on: q.country === r.c, lead: flagLead(r.c), title: r.c,
+        sub: `${fInt(r.a.n)} provider${r.a.n === 1 ? '' : 's'}${dcBy.get(r.c) ? ` · ${dcBy.get(r.c)} DC cities` : ''}`,
+        val: mm === 'price' ? f$(r.a.med) : mm === 'providers' ? fInt(r.a.n) : fMW(val(r)), valSub: mm === 'price' ? 'median' : mm === 'providers' ? 'HQ' : mm === 'op' ? 'live' : 'planned',
+        bar: mm === 'price' ? null : val(r) / mx, color: MK[mm],
+        onClick: () => set({ country: q.country === r.c ? null : r.c, city: null }) }));
+    } else {
+      const rows = cities.slice().sort((a, b) => b.n - a.n || d3.ascending(a.city, b.city));
+      const mx = d3.max(rows, (c) => c.n) || 1;
+      hint = 'Cities by providers with a data center there · tap to filter';
+      items = rows.map((c) => exItem({ on: q.city === c.city, lead: flagLead(c.country), title: c.city, sub: c.country,
+        val: fInt(c.n), valSub: c.n === 1 ? 'provider' : 'providers', bar: c.n / mx, color: 'var(--gx-city)',
+        onClick: () => set({ city: q.city === c.city ? null : c.city, pv: null }) }));
+    }
+    $('#ex-hint').textContent = hint;
+    const LIM = 60; const more = $('#ex-more'); more.hidden = items.length <= LIM; more.textContent = exAll ? 'Show fewer' : `Show all ${fInt(items.length)}`;
+    if (!items.length) { const li = document.createElement('li'); li.className = 'empty'; li.textContent = 'Nothing matches these filters. Try clearing the search or picking All regions.'; el.replaceChildren(li); return; }
+    el.replaceChildren(...(exAll ? items : items.slice(0, LIM)));
+  }
+  function drawFocus(v) {
+    const el = $('#ex-focus'); const q = P(); const p = q.pv ? v.byName.get(q.pv) : null;
+    if (!p) { el.hidden = true; el.replaceChildren(); return; }
+    el.hidden = false;
+    const fam = focus(); const br = provMin(v.prices.filter((r) => r.provider === p.provider), fam)[0];
+    const head = document.createElement('div'); head.className = 'fh';
+    const nm = document.createElement('div'); nm.className = 'fn'; const t = document.createElement('b'); t.textContent = p.provider; withLogo(t, p.provider, 'lg');
+    const sub = document.createElement('span'); sub.className = 'fs'; const hq = document.createElement('span'); hq.className = 'hqs'; hq.append('HQ '); const fl = flag(p.hq); if (fl) hq.append(fl); hq.append(p.hq); sub.append(hq, ` · ${p.category}`);
+    nm.append(t, sub);
+    const acts = document.createElement('div'); acts.className = 'fa';
+    const prof = document.createElement('button'); prof.type = 'button'; prof.className = 'gx-btn gx-pri'; prof.textContent = 'Full profile'; prof.onclick = () => openProfile(p.provider);
+    const cl = document.createElement('button'); cl.type = 'button'; cl.className = 'gx-ibtn gx-fx'; cl.setAttribute('aria-label', 'Clear provider from map'); cl.append(ICON('x')); cl.onclick = () => set({ pv: null });
+    acts.append(prof, cl); head.append(nm, acts);
+    const stats = document.createElement('div'); stats.className = 'fst';
+    [['Live power', p.op != null ? fMW(p.op) : '—'], ['Planned', p.pl != null ? fMW(p.pl) : '—'], [`${fam} from`, br ? `${f$(br.usd)}/hr` : '—'], ['GPU models', p.nm != null ? String(p.nm) : '—']].forEach(([l, x]) => { const d = document.createElement('div'); const e = document.createElement('em'); e.textContent = l; const s2 = document.createElement('strong'); s2.textContent = x; d.append(e, s2); stats.append(d); });
+    const cw = document.createElement('div'); cw.className = 'fc';
+    const rows = v.cities.filter((r) => r.provider === p.provider);
+    if (rows.length) {
+      const byC = d3.groups(rows, (r) => r.country).sort((a, b) => b[1].length - a[1].length);
+      const lab = document.createElement('span'); lab.className = 'fcl'; const nC = new Set(rows.map((r) => r.city)).size; lab.append(ICON('pin'), ` ${nC} data center ${nC === 1 ? 'city' : 'cities'}`); cw.append(lab);
+      byC.forEach(([c, a]) => { const g = document.createElement('span'); g.className = 'fcg'; const f2 = flag(c); if (f2) g.append(f2); const cs = [...new Set(a.map((r) => r.city))]; g.append(cs.join(', ')); g.title = c; cw.append(g); });
+    } else {
+      const lab = document.createElement('span'); lab.className = 'fcl'; lab.append(ICON('pin'), ' No specific cities named'); cw.append(lab);
+      if (p.locations) { const g = document.createElement('span'); g.className = 'fcg muted'; g.textContent = trunc(String(p.locations), 220); cw.append(g); }
+    }
+    el.replaceChildren(head, stats, cw);
   }
 
   /* ---------- pricing ---------- */
@@ -921,7 +1083,7 @@
     const bad = core.some((s) => s === 'error' || s === 'connect' || s === 'declined' || s === 'missing');
     if (bad || core.some((s) => s !== 'ok')) {
       CHARTS.forEach((s) => { const el = $(s); if (bad) { el.classList.remove('dash-skeleton'); fail(el); } else { el.replaceChildren(); el.classList.add('dash-skeleton'); } });
-      ['#rank', '#cheap tbody', '#dir tbody'].forEach((s) => $(s).replaceChildren());
+      ['#ex-list', '#cheap tbody', '#dir tbody'].forEach((s) => $(s).replaceChildren());
       $('#detail').hidden = true;
       return;
     }
@@ -933,7 +1095,7 @@
     const tab = tabOf();
     document.querySelectorAll('.gx-tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
     TABS.forEach((id) => { document.getElementById(id).hidden = id !== tab; });
-    if (tab === 'overview') { drawMap(v, f); drawRank(v, f); insOverview(v, f); drawPlist(v, f); }
+    if (tab === 'overview') { drawMap(v, f); drawExplorer(v, f); drawFocus(v); insOverview(v, f); }
     if (tab === 'pricing') { drawStrip(v, f); drawCheap(f); drawPGroup(f); insPricing(f); }
     if (tab === 'capacity') { drawMW(f); drawOwn(f); drawMWC(f); insCapacity(f); }
     if (tab === 'hardware') { drawAvail(v, f); drawGen(v, f); drawHeat(v, f); insHardware(v, f); }

@@ -69,9 +69,24 @@
 
   <!-- 01 Geography -->
   <section class="gx-panel" id="overview" role="tabpanel" aria-labelledby="tab-overview">
-    <div class="gx-intro"><span class="gx-ib"><svg class="i" aria-hidden="true"><use href="#i-globe"/></svg></span><h2>Where providers are based, and where the capacity sits</h2><p>Bubbles mark headquarters countries; switch to <b>DC cities</b> to see where providers actually run data centers. Click any country or city to filter every tab.</p></div>
+    <div class="gx-intro"><span class="gx-ib"><svg class="i" aria-hidden="true"><use href="#i-globe"/></svg></span><h2>Where providers come from, and where they run data centers</h2><p>Pick a provider to see its headquarters and every data center city it names on the map. Switch the list to <b>Countries</b> or <b>Cities</b> to filter by place.</p></div>
     <div class="gx-ins" id="ins-overview" data-source="providers prices flags"></div>
-    <div class="gx-mapgrid">
+    <div class="gx-explorer">
+      <aside class="gx-card gx-side" id="explorer" aria-label="Explore providers, countries and cities">
+        <div class="gx-sidehead">
+          <div class="gx-sidettl"><h3>Explore</h3><span class="gx-note" id="ex-count"></span></div>
+          <label class="gx-f gx-search gx-exq"><svg class="i gx-sic" aria-hidden="true"><use href="#i-search"/></svg><input id="ex-q" type="search" placeholder="Search provider, country or city" autocomplete="off" aria-label="Search providers, countries or cities"></label>
+          <div class="gx-rchips" id="ex-regions" role="group" aria-label="Headquarters region"></div>
+          <div class="gx-exmode" id="ex-mode" role="tablist" aria-label="List">
+            <button type="button" role="tab" data-ex="providers"><svg class="i" aria-hidden="true"><use href="#i-building"/></svg><span>Providers</span><em data-exn="providers"></em></button>
+            <button type="button" role="tab" data-ex="countries"><svg class="i" aria-hidden="true"><use href="#i-flag"/></svg><span>Countries</span><em data-exn="countries"></em></button>
+            <button type="button" role="tab" data-ex="cities"><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg><span>Cities</span><em data-exn="cities"></em></button>
+          </div>
+          <div class="gx-exbar"><span class="gx-note" id="ex-hint"></span><label class="gx-sort" id="ex-sortlab">Sort<select id="ex-sort" aria-label="Sort providers"><option value="op">Live power</option><option value="price">Lowest price</option><option value="cities">Most cities</option><option value="name">A–Z</option></select></label></div>
+        </div>
+        <ol class="gx-exlist" id="ex-list" data-source="providers prices dc_cities logos flags"></ol>
+        <button class="gx-btn gx-exmore" id="ex-more" type="button" hidden></button>
+      </aside>
       <div class="gx-card" id="map-card">
         <div class="gx-maphead">
           <div class="gx-mapttl"><h3 id="map-title">Providers by HQ country</h3><p class="gx-note" id="map-note"></p></div>
@@ -91,21 +106,10 @@
             </div>
           </div>
         </div>
+        <div class="gx-focus" id="ex-focus" data-source="providers dc_cities logos flags" hidden></div>
         <div class="gx-chart" id="map" data-source="world_map countries providers prices dc_cities" style="min-height:280px"></div>
         <div class="gx-legend" id="map-legend"></div>
       </div>
-      <div class="gx-card" id="rank-card">
-        <div><h3 id="rank-title">Top countries</h3><p class="gx-note" id="rank-note"></p></div>
-        <ol class="gx-rank" id="rank" data-source="providers prices flags"></ol>
-      </div>
-    </div>
-    <div class="gx-card" id="plist-card">
-      <div class="gx-ch">
-        <div><h3 id="plist-title">Providers in this view</h3><p class="gx-note" id="plist-note"></p></div>
-        <div class="gx-seg" id="plist-sort" role="group" aria-label="Sort providers"><button type="button" data-ps="op">Live power</button><button type="button" data-ps="price">Lowest price</button><button type="button" data-ps="cities">Most cities</button><button type="button" data-ps="name">A–Z</button></div>
-      </div>
-      <div class="gx-pgrid" id="plist" data-source="providers prices dc_cities logos"></div>
-      <button class="gx-btn" id="plist-more" type="button" hidden></button>
     </div>
   </section>
 
