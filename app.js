@@ -42,7 +42,7 @@
   const phone = matchMedia('(max-width:720px)');
   const placeSearch = () => { if (phone.matches) { if (searchLab.parentNode !== mbar) { mbar.prepend(searchLab); searchLab.classList.add('gx-msearch'); } } else if (searchLab.parentNode !== fBox) { fBox.insertBefore(searchLab, $('#f-reset')); searchLab.classList.remove('gx-msearch'); } };
   placeSearch(); (phone.addEventListener ? phone.addEventListener('change', placeSearch) : phone.addListener(placeSearch));
-  const sheet = (open) => { fBox.classList.toggle('open', open); scrim.hidden = !open; fTog.setAttribute('aria-expanded', String(open)); document.documentElement.style.overflow = open && phone.matches ? 'hidden' : ''; if (open) { const f = fBox.querySelector('select'); if (f) f.focus({ preventScroll: true }); } else fTog.focus({ preventScroll: true }); };
+  const sheet = (open) => { fBox.classList.toggle('open', open); scrim.hidden = !open; fTog.setAttribute('aria-expanded', String(open)); document.documentElement.style.overflow = open && phone.matches ? 'hidden' : ''; if (open) { const f = phone.matches ? $('#f-close') : fBox.querySelector('.gx-dd-btn'); if (f) f.focus({ preventScroll: true }); } else fTog.focus({ preventScroll: true }); };
   fTog.addEventListener('click', () => sheet(true));
   [scrim, $('#f-close'), $('#f-done')].forEach((el) => el.addEventListener('click', () => sheet(false)));
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && fBox.classList.contains('open')) sheet(false); });
@@ -291,6 +291,25 @@
     document.querySelectorAll('#pg-seg button').forEach((b) => b.setAttribute('aria-pressed', String((q.pgroup || 'region') === b.dataset.g)));
   }
 
+  // phone: active-filter chips beside the Filters button, sheet subtitle and the "Show N providers" button
+  function drawFSum(v, f) {
+    const q = P(); const box = $('#f-sum'); const items = [];
+    const pick = (id) => { const el = $(id); const o = el && el.options[el.selectedIndex]; return o ? ddParts(o.textContent).main : ''; };
+    if (q.vendor) items.push([pick('#f-vendor'), 'Chip', { vendor: null, family: null }]);
+    if (famSel()) items.push([pick('#f-family'), 'GPU', { family: null }]);
+    if (q.region) items.push([q.region, 'Region', { region: null, country: null }]);
+    if (q.country) items.push([q.country, 'Country', { country: null }]);
+    if (q.city) items.push([q.city, 'City', { city: null }]);
+    if (q.category) items.push([q.category, 'Model', { category: null }]);
+    if (q.ownership) items.push([pick('#f-ownership'), 'DC', { ownership: null }]);
+    if (q.q) items.push([`"${q.q}"`, 'Search', { q: null }]);
+    const tab = tabOf();
+    if (!items.length) { if (tab === 'overview') { const n = document.createElement('span'); n.className = 'fs-note'; n.textContent = `All ${fInt(f.provs.length)} providers`; box.replaceChildren(n); } else box.replaceChildren(); }
+    else box.replaceChildren(...items.map(([t, l, clr]) => { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-label', `Clear ${l}: ${t}`); const s2 = document.createElement('span'); s2.textContent = t; b.append(s2, ICON('x')); b.onclick = () => set(clr); return b; }));
+    $('#f-toggle').classList.toggle('has', items.length > 0);
+    $('#f-sub').textContent = items.length ? `${items.length} active · ${fInt(f.provs.length)} providers` : `${fInt(f.provs.length)} providers`;
+    $('#f-done').textContent = `Show ${fInt(f.provs.length)} provider${f.provs.length === 1 ? '' : 's'}`;
+  }
   /* ---------- KPIs + takeaway ---------- */
   function kset(k, t) { const e = document.querySelector(`#kpis [data-k="${k}"]`); e.textContent = t; e.classList.remove('dash-skeleton'); }
   function drawKpis(v, f) {
@@ -1260,7 +1279,7 @@
     d.wrap.classList.add('dd-on');
   }
   function ddClose(focusBtn) {
-    if (!ddOpen) return; const d = ddOpen; ddOpen = null; ddPop.hidden = true; ddScrim.hidden = true; ddPop.classList.remove('sheet'); document.documentElement.style.overflow = ''; d.btn.setAttribute('aria-expanded', 'false'); d.wrap.classList.remove('dd-open');
+    if (!ddOpen) return; const d = ddOpen; ddOpen = null; ddPop.hidden = true; ddScrim.hidden = true; ddPop.classList.remove('sheet'); document.documentElement.style.overflow = fBox.classList.contains('open') && phone.matches ? 'hidden' : ''; d.btn.setAttribute('aria-expanded', 'false'); d.wrap.classList.remove('dd-open');
     if (focusBtn) d.btn.focus();
   }
   function ddRender(d, q) {
@@ -1365,7 +1384,7 @@
     applyTheme();
     root.style.setProperty('--gx-accent', 'var(--gx-gblue)'); root.style.setProperty('--gx-accent-2', C(3));
     const v = prep(); const f = filt(v);
-    drawFilters(v); drawKpis(v, f);
+    drawFilters(v); drawFSum(v, f); drawKpis(v, f);
     const tab = tabOf(); root.dataset.tab = tab;
     document.querySelectorAll('.gx-tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
     TABS.forEach((id) => { document.getElementById(id).hidden = id !== tab; });

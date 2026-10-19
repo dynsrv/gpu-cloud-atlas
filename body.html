@@ -52,10 +52,10 @@
       <button type="button" role="tab" data-tab="hardware" id="tab-hardware"><svg class="i" aria-hidden="true"><use href="#i-cpu"/></svg><span>GPU models</span></button>
       <button type="button" role="tab" data-tab="directory" id="tab-directory"><svg class="i" aria-hidden="true"><use href="#i-list"/></svg><span>Directory</span></button>
     </div>
-    <div class="gx-mbar"><button type="button" class="gx-btn gx-ftoggle" id="f-toggle" aria-controls="filters" aria-expanded="false"><svg class="i" aria-hidden="true"><use href="#i-sliders"/></svg><span>Filters</span><span class="n" id="f-count" hidden></span></button></div>
+    <div class="gx-mbar"><button type="button" class="gx-btn gx-ftoggle" id="f-toggle" aria-controls="filters" aria-expanded="false"><svg class="i" aria-hidden="true"><use href="#i-sliders"/></svg><span>Filters</span><span class="n" id="f-count" hidden></span></button><div class="gx-fsum" id="f-sum" aria-label="Active filters"></div></div>
     <div class="gx-scrim" id="f-scrim" hidden></div>
     <div class="gx-filters" id="filters" data-source="providers gpu_families">
-      <div class="gx-sheethead"><b>Filters</b><button type="button" class="gx-ibtn" id="f-close" aria-label="Close filters"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+      <div class="gx-sheethead"><span class="sh-t"><b>Filters</b><small id="f-sub"></small></span><button type="button" class="gx-ibtn" id="f-close" aria-label="Close filters"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg></button></div>
       <label class="gx-f"><span><svg class="i" aria-hidden="true"><use href="#i-cpu"/></svg>Chip</span><select id="f-vendor" aria-label="Chip maker"></select></label>
       <label class="gx-f"><span><svg class="i" aria-hidden="true"><use href="#i-gpu"/></svg>GPU</span><select id="f-family" aria-label="Focus GPU"></select></label>
       <label class="gx-f"><span><svg class="i" aria-hidden="true"><use href="#i-globe"/></svg>Region</span><select id="f-region" aria-label="HQ region"></select></label>
