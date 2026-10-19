@@ -818,10 +818,12 @@
     const W = Math.max(300, el.clientWidth || 600); const NR = W < 560; const rowH = NR ? 46 : 26, m = { t: 26, r: NR ? 8 : 60, b: 6 }; const cy = NR ? 32 : rowH / 2;
     const H = m.t + m.b + groups.length * rowH;
     const svg = svgFor(el, W, H, 'Price range by GPU model');
-    const maxCh = NR ? 34 : 40; const short = (t) => (t.length > maxCh ? t.slice(0, maxCh - 1) + '…' : t);
-    groups.forEach((g) => { g.lab = `${short(g.k)} · ${g.n}`; });
-    const labels = groups.map((g) => g.lab);
-    const lw = NR ? 8 : Math.min(W * 0.34, measure(svg, labels) + 12);
+    const maxCh = NR ? 28 : 26; const short = (t) => (t.length > maxCh ? t.slice(0, maxCh - 1) + '…' : t);
+    // label = GPU name + a pill with how many providers publish a price for it
+    groups.forEach((g) => { g.np = new Set(g.a.map((r) => r.provider)).size; g.lab = short(g.k); g.pill = `${g.np} provider${g.np === 1 ? '' : 's'}`; });
+    const nameW = new Map(groups.map((g) => [g.k, measure(svg, [g.lab], 'strong')]));
+    const pillW = new Map(groups.map((g) => [g.k, measure(svg, [g.pill], 'gx-pilltx') + 14]));
+    const lw = NR ? 8 : Math.min(W * 0.4, d3.max(groups, (g) => nameW.get(g.k) + pillW.get(g.k)) + 22);
     const all = groups.flatMap((g) => g.a.map((r) => r.usd));
     const x = d3.scaleLog([Math.max(0.01, d3.min(all) * 0.85), d3.max(all) * 1.15], [lw, W - m.r]);
     const ticks = [0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 50].filter((t) => t >= x.domain()[0] && t <= x.domain()[1]);
@@ -831,9 +833,17 @@
     ax.selectAll('text').data(tk).join('text').attr('x', x).attr('y', m.t - 12).attr('text-anchor', 'middle').attr('class', 'mono').text((t) => '$' + t);
     const g = svg.selectAll('g.row').data(groups).join('g').attr('class', 'row').attr('transform', (d, i) => `translate(0,${m.t + i * rowH})`);
     g.append('rect').attr('x', 0).attr('width', W).attr('height', rowH).attr('fill', (d) => (d.k === fam ? 'var(--color-bg)' : 'transparent')).attr('rx', 4);
-    g.append('text').attr('x', NR ? 8 : lw - 10).attr('y', NR ? 13 : rowH / 2).attr('dy', '0.35em').attr('text-anchor', NR ? 'start' : 'end')
-      .attr('class', (d) => (d.k === fam || NR ? 'strong' : null)).style('cursor', 'pointer').text((d) => d.lab)
+    const ly = NR ? 13 : rowH / 2;
+    // desktop: [name][pill] right-aligned to the label column; phone: name then pill from the left
+    const pillX = (d) => (NR ? 8 + nameW.get(d.k) + 8 : lw - 10 - pillW.get(d.k));
+    g.append('text').attr('x', (d) => (NR ? 8 : pillX(d) - 7)).attr('y', ly).attr('dy', '0.35em').attr('text-anchor', NR ? 'start' : 'end')
+      .attr('class', 'strong').style('cursor', 'pointer').text((d) => d.lab)
       .on('click', (e, d) => set({ family: d.k }));
+    const pg = g.append('g').attr('class', (d) => 'gx-npill' + (d.k === fam ? ' on' : '')).attr('transform', (d) => `translate(${pillX(d)},${ly - 9})`)
+      .style('cursor', 'pointer').on('click', (e, d) => set({ family: d.k }))
+      .on('mousemove', (e, d) => tipShow(e, d.k, [['Providers with a published price', String(d.np)], ['Price points', String(d.n)], ['Median', `${f$(d.med)}/GPU-hr`]])).on('mouseleave', tipHide);
+    pg.append('rect').attr('width', (d) => pillW.get(d.k)).attr('height', 18).attr('rx', 9);
+    pg.append('text').attr('class', 'gx-pilltx').attr('x', (d) => pillW.get(d.k) / 2).attr('y', 9).attr('dy', '0.35em').attr('text-anchor', 'middle').text((d) => d.pill);
     g.append('rect').attr('x', (d) => x(d.q1)).attr('width', (d) => Math.max(2, x(d.q3) - x(d.q1))).attr('y', cy - 6).attr('height', 12).attr('rx', 4)
       .attr('fill', (d) => (d.k === fam ? C(0) : MUTED)).attr('fill-opacity', 0.28);
     g.each(function (d) {

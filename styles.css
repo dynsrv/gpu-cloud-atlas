@@ -741,3 +741,10 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 @media (max-width:900px){.gx-hero-art{width:400px;right:-110px;opacity:.75}}
 @media (max-width:720px){.gx-hero-art{width:300px;right:-120px;top:-50px;transform:none;opacity:.45;
   -webkit-mask-image:radial-gradient(circle at 60% 50%,#000 45%,transparent 75%);mask-image:radial-gradient(circle at 60% 50%,#000 45%,transparent 75%)}}
+
+/* provider-count pill in the price range chart */
+.gx-npill rect{fill:color-mix(in srgb,var(--gx-gblue) 11%,var(--color-panel));stroke:color-mix(in srgb,var(--gx-gblue) 30%,transparent);stroke-width:1}
+.gx-npill text,.gx-pilltx{font-size:11px;font-weight:600;fill:var(--gx-gblue);font-variant-numeric:tabular-nums}
+.gx-npill.on rect{fill:var(--gx-gblue);stroke:none}
+.gx-npill.on text{fill:var(--gx-gblue-ink)}
+.gx-npill:hover rect{stroke:var(--gx-gblue)}
