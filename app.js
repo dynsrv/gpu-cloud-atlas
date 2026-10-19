@@ -1246,6 +1246,8 @@
   const DD = [];
   let ddOpen = null;
   const ddPop = document.createElement('div'); ddPop.className = 'gx-dd-pop'; ddPop.hidden = true; ddPop.setAttribute('role', 'listbox'); root.append(ddPop);
+  const ddScrim = document.createElement('div'); ddScrim.className = 'gx-dd-scrim'; ddScrim.hidden = true; root.append(ddScrim);
+  ddScrim.addEventListener('click', () => ddClose());
   // "H100 · NVIDIA (258)" -> main "H100", sub "NVIDIA", count "258"
   function ddParts(t) {
     const m = String(t).match(/^(.*?)\s*\(([\d,]+)(?:\s+[a-z ]+)?\)\s*$/i); let main = m ? m[1] : String(t); const cnt = m ? m[2] : '';
@@ -1255,10 +1257,10 @@
   function ddSync(d) {
     const o = d.sel.options[d.sel.selectedIndex]; const pp = ddParts(o ? o.textContent : '');
     d.val.textContent = pp.main; d.btn.title = o ? o.textContent : '';
-    d.wrap.classList.toggle('dd-on', fineHover.matches);
+    d.wrap.classList.add('dd-on');
   }
   function ddClose(focusBtn) {
-    if (!ddOpen) return; const d = ddOpen; ddOpen = null; ddPop.hidden = true; d.btn.setAttribute('aria-expanded', 'false'); d.wrap.classList.remove('dd-open');
+    if (!ddOpen) return; const d = ddOpen; ddOpen = null; ddPop.hidden = true; ddScrim.hidden = true; ddPop.classList.remove('sheet'); document.documentElement.style.overflow = ''; d.btn.setAttribute('aria-expanded', 'false'); d.wrap.classList.remove('dd-open');
     if (focusBtn) d.btn.focus();
   }
   function ddRender(d, q) {
@@ -1290,6 +1292,15 @@
     if (ddOpen === d) { ddClose(true); return; } ddClose(); ddOpen = d;
     const many = d.sel.options.length > 10;
     ddPop.replaceChildren(); d.search = null;
+    const asSheet = phone.matches;
+    if (asSheet) {
+      // phones: bottom sheet with a title and a close button
+      const hd = document.createElement('div'); hd.className = 'gx-dd-head';
+      const lab = d.wrap.querySelector(':scope > span'); const t = document.createElement('b'); t.textContent = lab ? lab.textContent.trim() : (d.sel.getAttribute('aria-label') || 'Choose');
+      if (lab && lab.querySelector('svg')) t.prepend(lab.querySelector('svg').cloneNode(true));
+      const x = document.createElement('button'); x.type = 'button'; x.className = 'gx-ibtn'; x.setAttribute('aria-label', 'Close'); x.append(ICON('x')); x.onclick = () => ddClose(true);
+      hd.append(t, x); ddPop.append(hd);
+    }
     if (many) {
       const sw = document.createElement('div'); sw.className = 'gx-dd-search'; sw.append(ICON('search'));
       const si = document.createElement('input'); si.type = 'search'; si.placeholder = 'Search…'; si.setAttribute('aria-label', 'Search options'); si.autocomplete = 'off';
@@ -1299,6 +1310,11 @@
     d.list = document.createElement('div'); d.list.className = 'gx-dd-list'; ddPop.append(d.list);
     ddRender(d, '');
     ddPop.hidden = false; d.btn.setAttribute('aria-expanded', 'true'); d.wrap.classList.add('dd-open');
+    if (asSheet) {
+      ddPop.classList.add('sheet'); ddScrim.hidden = false; document.documentElement.style.overflow = 'hidden';
+      ['left', 'top', 'bottom', 'minWidth', 'maxHeight'].forEach((k) => { ddPop.style[k] = ''; });
+      ddActive(d); return;
+    }
     const rr = root.getBoundingClientRect(), br = d.wrap.getBoundingClientRect();
     const w = Math.max(br.width, d.compact ? 180 : 260);
     let left = br.left - rr.left; if (br.left + w > window.innerWidth - 8) left = Math.max(8, window.innerWidth - 8 - w - rr.left);
@@ -1330,9 +1346,12 @@
     DD.push(d); ddSync(d);
   });
   document.addEventListener('mousedown', (e) => { if (ddOpen && !ddPop.contains(e.target) && !ddOpen.wrap.contains(e.target)) ddClose(); });
-  window.addEventListener('resize', () => ddClose());
+  window.addEventListener('resize', () => { if (!ddPop.classList.contains('sheet')) ddClose(); }); // the phone keyboard resizes the window; keep the sheet open
   fineHover.addEventListener && fineHover.addEventListener('change', () => DD.forEach(ddSync));
   const ddSyncAll = () => DD.forEach(ddSync);
+  // phone filter row: drop the right-edge fade once scrolled to the end
+  const fEdge = () => { const f = $('#filters'); f.classList.toggle('at-end', f.scrollLeft + f.clientWidth >= f.scrollWidth - 4); };
+  $('#filters').addEventListener('scroll', fEdge, { passive: true });
   const render = () => {
     const core = ['providers', 'prices', 'gpu_families'].map((id) => dash.data(id).status);
     const bad = core.some((s) => s === 'error' || s === 'connect' || s === 'declined' || s === 'missing');
@@ -1355,7 +1374,7 @@
     if (tab === 'capacity') { drawMW(f); drawOwn(f); drawMWC(f); insCapacity(f); }
     if (tab === 'hardware') { drawAvail(v, f); drawGen(v, f); drawHeat(v, f); insHardware(v, f); }
     if (tab === 'directory') { drawDir(f); drawDetail(v); }
-    ddSyncAll();
+    ddSyncAll(); fEdge();
     if (!jumped) { jumped = true; const h = location.hash.slice(1); if (TABS.includes(h) && h !== tab) set({ tab: h }); }
   };
   dash.onData(render);

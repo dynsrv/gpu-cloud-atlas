@@ -847,3 +847,55 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 @media (min-width:1024px){
   .gx{box-sizing:border-box;width:100%;max-width:1760px;margin-inline:auto;padding-inline:clamp(24px,4vw,64px)}
 }
+
+/* ===== phone: filters always visible as a swipeable row of pills ===== */
+.gx-dd-scrim{display:none}
+@media (max-width:720px){
+  .gx-ftoggle{display:none!important}
+  .gx-mbar{display:flex}
+  .gx-mbar .gx-msearch{flex:1}
+  .gx-filters,.gx-filters.open{display:flex!important;position:static!important;flex-wrap:nowrap;align-items:center;gap:8px;overflow-x:auto;overflow-y:hidden;max-height:none!important;
+    margin:var(--s2) calc(-1 * var(--s3)) 0!important;padding:2px var(--s3) 4px!important;background:transparent!important;box-shadow:none!important;border-radius:0!important;animation:none!important;
+    scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scroll-padding-inline:var(--s3)}
+  .gx-filters::-webkit-scrollbar{display:none}
+  .gx-filters .gx-sheethead,.gx-filters .gx-done{display:none!important}
+  .gx-filters .gx-f{flex:none!important;width:auto!important;min-width:0!important;flex-direction:row!important;align-items:center;gap:6px;height:38px;min-height:38px;padding:0 30px 0 12px!important;
+    border-radius:999px!important;border:1px solid var(--gx-line)!important;background:var(--color-panel)!important;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+  .gx-filters .gx-f>span{font-size:12px!important;gap:5px;color:var(--color-fg-muted)}
+  .gx-filters .gx-f>span .i{width:14px;height:14px}
+  .gx-filters .gx-f .gx-dd-btn{max-width:42vw!important;font-size:13px!important;font-weight:600}
+  .gx-filters .gx-f::after{right:12px;width:5px;height:5px}
+  .gx-filters .gx-f.is-set{background:color-mix(in srgb,var(--gx-gblue) 10%,var(--color-panel))!important;border-color:color-mix(in srgb,var(--gx-gblue) 55%,var(--gx-line))!important}
+  .gx-filters .gx-f.is-set>span,.gx-filters .gx-f.is-set .gx-dd-btn{color:var(--gx-gblue)!important}
+  .gx-filters .gx-f.is-set>span .lbt{display:none}
+  .gx-filters #f-reset{flex:none;order:99;height:38px;min-height:38px!important;padding:0 14px;border-radius:999px!important;font-size:13px}
+  .gx-filters #f-reset:not(.is-active){opacity:.75}
+  .gx-filters #f-chips{display:contents!important}
+  .gx-filters #f-chips[hidden]{display:none!important}
+  .gx-filters .gx-chip{flex:none;height:38px;min-height:38px;border-radius:999px;font-size:13px;white-space:nowrap}
+  /* edge fade hints that the row scrolls */
+  .gx-nav{position:sticky}
+  .gx-filters{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
+  .gx-filters.at-end{-webkit-mask-image:none;mask-image:none}
+
+  /* dropdown as a bottom sheet */
+  .gx-dd-scrim:not([hidden]){display:block;position:fixed;inset:0;z-index:70;background:rgba(15,23,42,.45);animation:gx-fade .18s ease-out}
+  @keyframes gx-fade{from{opacity:0}}
+  .gx-dd-pop.sheet{position:fixed!important;left:0!important;right:0!important;bottom:0!important;top:auto!important;z-index:71;max-width:none!important;min-width:0!important;max-height:min(78vh,620px)!important;
+    padding:6px 12px calc(12px + env(safe-area-inset-bottom))!important;border:0!important;border-radius:22px 22px 0 0!important;box-shadow:0 -18px 48px -12px rgba(15,23,42,.4)!important;animation:gx-sheet-up .24s cubic-bezier(.2,.8,.2,1)}
+  @keyframes gx-sheet-up{from{transform:translateY(40px);opacity:.5}to{transform:none;opacity:1}}
+  .gx-dd-pop.sheet::before{content:"";display:block;width:38px;height:4px;margin:4px auto 6px;border-radius:2px;background:var(--gx-line-strong,#C5CBD3);flex:none}
+  .gx-dd-head{display:flex;align-items:center;justify-content:space-between;padding:4px 4px 10px;flex:none}
+  .gx-dd-head b{display:inline-flex;align-items:center;gap:8px;font-size:17px;font-weight:600}
+  .gx-dd-head b .i{width:18px;height:18px;color:var(--gx-gblue)}
+  .gx-dd-pop.sheet .gx-dd-search{height:44px!important;margin:0 0 8px;border-radius:12px!important}
+  .gx-dd-pop.sheet .gx-dd-search input{font-size:16px!important}
+  .gx-dd-pop.sheet .gx-dd-opt{min-height:48px;padding:10px 12px;border-radius:12px;font-size:15px}
+  .gx-dd-pop.sheet .gx-dd-opt .tx{flex-direction:row}
+  .gx-dd-pop.sheet .gx-dd-opt .tx small{font-size:12px}
+  .gx-dd-pop.sheet .gx-dd-opt em{font-size:12px;padding:2px 9px}
+  .gx-dd-pop.sheet .gx-dd-opt .ck .i{width:18px;height:18px}
+  .gx-dd-pop.sheet .gx-dd-opt.act:not(.sel){background:transparent}
+  .gx-dd-pop.sheet .gx-dd-list{gap:2px}
+}
+@media (max-width:720px) and (prefers-reduced-motion:reduce){.gx-dd-pop.sheet,.gx-dd-scrim{animation:none}}
