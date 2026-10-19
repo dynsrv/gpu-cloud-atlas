@@ -608,3 +608,59 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .gx-rchips .rgt.on i{background:var(--gx-gblue-ink);opacity:.6}
 @media (max-width:900px){.gx-rchips .rgg{grid-template-columns:repeat(6,minmax(0,1fr))}}
 @media (max-width:720px){.gx-rchips .rgg{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* ===== declutter + one radius scale (slightly rounded everywhere) ===== */
+.gx{--r-sm:6px!important;--r-md:10px!important;--r-lg:14px!important}
+.gx-hero,.gx-card,.gx-in,.gx-f,.gx-btn,.gx-search,.gx-tabs,.gx-seg,.gx-exmode,.gx-kpis,.gx-kpi,.gx-layers button,.gx-tablebox,.gx-focus,.gx-zoom,.gx-theme,.gx-chip,.gx-pc,.gx-rchips .rgt,.gx-xr,.gx-focus .fst div,.gx-sort select,.gx-tip,.gx-dpanel{border-radius:var(--r-md)!important}
+.gx-hero,.gx-card,.gx-focus{border-radius:var(--r-lg)!important}
+.gx-tabs button,.gx-seg button,.gx-exmode button,.gx-ftoggle{border-radius:var(--r-sm)!important}
+.gx-zoom{overflow:hidden}
+.gx .flag{border-radius:3px}
+.gx .gx-logo{border-radius:7px}
+.gx .gx-logo.lg{border-radius:8px}
+.gx .gx-logo.sm{border-radius:5px}
+#map svg{border-radius:var(--r-md)}
+/* section intros repeat the tab names: drop them */
+.gx-intro{display:none!important}
+/* hero: title, one-line takeaway, key figures */
+.gx-hero{gap:var(--s4)!important;padding:var(--s6) clamp(16px,3vw,32px)!important}
+.gx-take{font-size:var(--t-md)!important;line-height:1.5!important}
+/* map layers: compact switch, values already shown in the key figures */
+.gx-layers .gx-lgl,.gx-layers .v{display:none!important}
+.gx-layers{gap:6px!important;align-items:center!important}
+.gx-lgrp{flex-direction:row!important}
+.gx-lrow{gap:6px!important}
+.gx-layers button{display:inline-flex!important;align-items:center;gap:7px;min-width:0!important;padding:7px 12px!important;font-size:var(--t-sm)}
+.gx-layers button .l{font-size:var(--t-sm)!important;color:var(--color-fg-muted)}
+.gx-layers button[aria-checked=true] .l{color:var(--color-fg)!important;font-weight:600}
+.gx-layers button .sw{width:9px!important;height:9px!important;border-radius:50%!important}
+.gx-maphead{flex-direction:row!important;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:var(--s3)!important}
+.gx-mapttl h3{margin:0}
+#map-note:empty{display:none}
+#map-card.pv-on .gx-mapttl{display:none}
+#map-card.pv-on .gx-maphead{justify-content:flex-end}
+/* explorer: the list explains itself */
+#ex-hint{display:none}
+.gx-exbar{justify-content:flex-end;min-height:0!important}
+.gx-exbar:has(#ex-sortlab[hidden]){display:none}
+/* on Geography the explorer owns region, country and search: hide those duplicates in the top bar */
+.gx[data-tab="overview"] .gx-filters .gx-f:has(#f-region),
+.gx[data-tab="overview"] .gx-filters .gx-f:has(#f-country),
+.gx[data-tab="overview"] .gx-filters .gx-search:not(.gx-msearch){display:none!important}
+@media (max-width:720px){
+  .gx-hero{padding:var(--s4)!important}
+  .gx-maphead{flex-direction:column!important;align-items:stretch!important}
+}
+
+#takeaway{display:none!important}
+@media (min-width:721px){.gx-kpis .gx-kpi{border-radius:0!important}}
+
+@media (max-width:720px){
+  .gx-layers{flex-wrap:wrap!important;overflow:visible!important;margin:0!important;padding:0!important;min-width:0;max-width:100%}
+  .gx-lgrp,.gx-lrow{flex-wrap:wrap!important;overflow:visible!important;min-width:0;max-width:100%}
+  .gx-layers button{padding:6px 10px!important}
+  .gx-layers button .l{font-size:12.5px!important}
+}
+
+.gx[data-tab="overview"] .gx-mbar .gx-msearch{display:none!important}
+.gx[data-tab="overview"] .gx-mbar .gx-ftoggle{flex:1;justify-content:center}

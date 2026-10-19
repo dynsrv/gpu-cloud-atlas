@@ -236,8 +236,6 @@
     const fc = $('#f-count'); fc.hidden = !nSet; fc.textContent = String(nSet); $('#f-toggle').setAttribute('aria-label', nSet ? `Filters, ${nSet} active` : 'Filters');
     const chips = $('#f-chips'); const list = [];
     if (q.city) list.push(['Data center in ' + q.city, { city: null }]);
-    if (q.sel) list.push(['Profile: ' + q.sel, { sel: null }]);
-    if (q.pv) list.push(['On map: ' + q.pv, { pv: null }]);
     chips.hidden = !list.length;
     chips.replaceChildren(...list.map(([t, clr]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'gx-chip'; b.textContent = t + '  ×'; b.setAttribute('aria-label', 'Clear ' + t); b.onclick = () => set(clr); return b; }));
     document.querySelectorAll('#metric button').forEach((b) => { const on = (q.metric || 'providers') === b.dataset.m; b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1; });
@@ -253,7 +251,7 @@
     const owns = f.provs.filter((p) => p.ownership === 'Yes').length;
     const mins = provMin(f.prices, fam); const med = d3.median(mins, (r) => r.usd);
     const opP = f.provs.filter((p) => p.op != null), plP = f.provs.filter((p) => p.pl != null);
-    kset('providers', fInt(n)); kset('providers_sub', `of ${fInt(v.provs.length)} in the dataset`);
+    kset('providers', fInt(n)); kset('providers_sub', n === v.provs.length ? 'worldwide' : `of ${fInt(v.provs.length)} total`);
     kset('countries', fInt(byC.size)); kset('countries_sub', topC ? `Most: ${topC[0]} (${topC[1]})` : '');
     kset('owns', n ? fPct(owns / n) : '—'); kset('owns_sub', `${fInt(owns)} providers`);
     kset('price_lab', `${fam} median`); kset('price', med == null ? '—' : f$(med)); kset('price_sub', `lowest rate per GPU-hr · ${mins.length} providers`);
@@ -266,10 +264,9 @@
     const capC = [...d3.rollup(opP.filter((p) => p.hq !== 'Unknown'), (a) => d3.sum(a, (p) => p.op), (p) => p.hq)].sort((a, b) => b[1] - a[1])[0];
     const parts = [];
     const B = (x) => { const b = document.createElement('b'); b.textContent = x; return b; };
-    parts.push(B(`${fInt(n)} providers`), ` headquartered in ${byC.size} ${byC.size === 1 ? 'country' : 'countries'}. `);
-    if (cheapest) parts.push(`The cheapest ${fam} is `, B(`${f$(cheapest.usd)}/GPU-hr`), ` from ${cheapest.provider}, against a median of ${f$(med)}. `);
-    else parts.push(`None of them publish a ${fam} price. `);
-    if (capC) parts.push(`Providers based in ${capC[0]} disclose the most live capacity, `, B(fMW(capC[1])), '.');
+    if (cheapest) parts.push(`Cheapest ${fam} right now: `, B(`${f$(cheapest.usd)}/GPU-hr`), ` from ${cheapest.provider}.`);
+    else parts.push(`No ${fam} price published in this selection.`);
+    if (capC) parts.push(' Most live capacity is held by ', B(capC[0]), '-based providers.');
     take.replaceChildren(...parts);
   }
 
@@ -496,6 +493,7 @@
       ? `${fc} of ${f.provs.length} providers name at least one city; the rest list only countries or regions. Ctrl/⌘ + scroll or the buttons to zoom.`
       : (unk ? `${unk} provider${unk > 1 ? 's' : ''} without a stated HQ ${unk > 1 ? 'are' : 'is'} not on the map. ` : '') +
         (m === 'op' || m === 'pl' ? 'Only providers that publish an MW figure count. ' : m === 'price' ? `Color is the median of each provider's lowest ${fam} rate. ` : '') + 'Ctrl/⌘ + scroll to zoom.';
+    $('#map-note').textContent = $('#map-note').textContent.replace(/\s*Ctrl\/⌘ \+ scroll( or the buttons)? to zoom\.?/, '').trim();
     document.querySelector('#map-card').classList.toggle('pv-on', !!pv);
     if (pv) {
       $('#map-title').textContent = `${pv.provider}: headquarters and data centers`;
@@ -1057,8 +1055,6 @@
     const topCity = cityAgg(v, f).sort((a, b) => b.n - a.n)[0];
     insights('#ins-overview', [
       ['Top data center city', topCity ? topCity.city : '—', topCity ? ['named as a data center location by ', [`${topCity.n} providers`], ` (${topCity.country}).`] : ['No city named by these providers.'], topCity && topCity.country],
-      ['Biggest hub', top ? fPct(top[1].n / n) : '—', top ? ['of providers are based in ', [top[0]], ` (${top[1].n} of ${f.provs.length}).`] : ['No providers match.'], top && top[0]],
-      ['Most live capacity', cap ? fMW(cap[1].op) : '—', cap ? ['disclosed by ', [`${cap[1].opn} ${cap[0]}`], `-based provider${cap[1].opn > 1 ? 's' : ''}.`] : ['No live capacity disclosed in this selection.'], cap && cap[0]],
       [`Cheapest ${fam} hub`, cheap ? f$(cheap[1].med) : '—', cheap ? ['median per GPU-hr among ', [`${cheap[1].pn} providers in ${cheap[0]}`], ` · range ${f$(d3.min(cheap[1].prices))}–${f$(d3.max(cheap[1].prices))} · `, termsText(cheap[1].rows), '.'] : [`No country has two or more ${fam} prices.`], cheap && cheap[0]],
     ]);
   }
@@ -1114,7 +1110,7 @@
     root.style.setProperty('--gx-accent', 'var(--gx-gblue)'); root.style.setProperty('--gx-accent-2', C(3));
     const v = prep(); const f = filt(v);
     drawFilters(v); drawKpis(v, f);
-    const tab = tabOf();
+    const tab = tabOf(); root.dataset.tab = tab;
     document.querySelectorAll('.gx-tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
     TABS.forEach((id) => { document.getElementById(id).hidden = id !== tab; });
     if (tab === 'overview') { drawMap(v, f); drawExplorer(v, f); drawFocus(v); insOverview(v, f); }
