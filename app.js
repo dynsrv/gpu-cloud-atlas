@@ -512,7 +512,7 @@
       hqm.select('.hqlab').attr('dy', -16 / Math.sqrt(k)).style('font-size', `${11 / (s * k)}px`);
       lab.attr('x', (d) => d.px + rr(d) / Math.sqrt(k) + 3 / k).attr('y', (d) => d.py).style('font-size', `${10.5 / (s * k)}px`);
     };
-    const zoom = d3.zoom().scaleExtent([1, 10]).translateExtent([[0, 0], [W, H]]).extent([[0, 0], [W, H]])
+    const zoom = d3.zoom().scaleExtent([1, 14]).translateExtent([[0, 0], [W, H]]).extent([[0, 0], [W, H]])
       .filter((e) => (e.type === 'wheel' ? e.ctrlKey || e.metaKey : e.type && e.type.startsWith('touch') ? e.touches.length >= 2 : !e.button)) // one finger scrolls the page; two fingers pinch the map
       .on('zoom', (e) => { zoomT = e.transform; g.attr('transform', e.transform); paint(e.transform.k); });
     svg.call(zoom).on('dblclick.zoom', null);
@@ -526,7 +526,8 @@
         const bw = Math.max(60, x1 - x0), bh = Math.max(40, y1 - y0); const k = Math.max(1, Math.min(7, 0.78 / Math.max(bw / W, bh / H)));
         tr = d3.zoomIdentity.translate(W / 2 - k * (x0 + x1) / 2, H / 2 - k * (y0 + y1) / 2).scale(k);
       } else if (node) {
-        const b = node.getBBox(); const k = Math.max(1, Math.min(8, 0.75 / Math.max(b.width / W, b.height / H)));
+        // frame the main landmass (precomputed bb) so overseas territories don't zoom the map out
+        const dd = d3.select(node).datum(); const b = dd && dd.bb ? { x: dd.bb[0], y: dd.bb[1], width: Math.max(dd.bb[2] - dd.bb[0], 4), height: Math.max(dd.bb[3] - dd.bb[1], 4) } : node.getBBox(); const k = Math.max(1, Math.min(10, 0.75 / Math.max(b.width / W, b.height / H)));
         tr = d3.zoomIdentity.translate(W / 2 - k * (b.x + b.width / 2), H / 2 - k * (b.y + b.height / 2)).scale(k);
       }
       svg.call(zoom.transform, zoomT || d3.zoomIdentity);
