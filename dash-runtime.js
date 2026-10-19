@@ -19,7 +19,8 @@
     setLink: () => {},
   };
   window.addEventListener('popstate', () => { params = readUrl(); fire(); });
-  SETS.forEach((id) => fetch('/data/' + id + '.json').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  const V = (() => { try { return new URL(document.currentScript.src).searchParams.get('v') || ''; } catch (e) { return ''; } })();
+  SETS.forEach((id) => fetch('/data/' + id + '.json' + (V ? '?v=' + V : '')).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then((d) => { store[id] = { status: 'ok', data: d }; fire(); })
     .catch(() => { store[id] = { status: 'error', data: null }; fire(); }));
 })();
