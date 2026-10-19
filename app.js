@@ -820,9 +820,9 @@
     const svg = svgFor(el, W, H, 'Price range by GPU model');
     const maxCh = NR ? 28 : 26; const short = (t) => (t.length > maxCh ? t.slice(0, maxCh - 1) + '…' : t);
     // label = GPU name + a pill with how many providers publish a price for it
-    groups.forEach((g) => { g.np = new Set(g.a.map((r) => r.provider)).size; g.lab = short(g.k); g.pill = `${g.np} provider${g.np === 1 ? '' : 's'}`; });
+    groups.forEach((g) => { g.np = new Set(g.a.map((r) => r.provider)).size; g.lab = short(g.k); g.pill = String(g.np); });
     const nameW = new Map(groups.map((g) => [g.k, measure(svg, [g.lab], 'strong')]));
-    const pillW = new Map(groups.map((g) => [g.k, measure(svg, [g.pill], 'gx-pilltx') + 14]));
+    const pillW = new Map(groups.map((g) => [g.k, measure(svg, [g.pill], 'gx-pilltx') + 16]));
     const lw = NR ? 8 : Math.min(W * 0.4, d3.max(groups, (g) => nameW.get(g.k) + pillW.get(g.k)) + 22);
     const all = groups.flatMap((g) => g.a.map((r) => r.usd));
     const x = d3.scaleLog([Math.max(0.01, d3.min(all) * 0.85), d3.max(all) * 1.15], [lw, W - m.r]);
