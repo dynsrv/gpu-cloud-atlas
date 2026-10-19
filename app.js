@@ -79,22 +79,57 @@
   const withLogo = (el, provider, size) => { el.prepend(logo(provider, size)); return el; };
 
   /* ---------- tooltip ---------- */
-  function tipShow(ev, title, lines) {
-    const t = document.createElement('div'); t.className = 't'; t.textContent = title;
-    const nodes = [t];
-    lines.forEach(([l, v, c]) => {
-      const d = document.createElement('div');
-      if (c) { const i = document.createElement('span'); i.className = 'dot'; i.style.background = c; d.append(i); }
-      if (l) d.append(l + ' ');
-      const b = document.createElement('b'); b.textContent = v; d.append(b);
-      nodes.push(d);
-    });
-    tip.replaceChildren(...nodes); tip.hidden = false;
-    const r = root.getBoundingClientRect();
-    let x = ev.clientX - r.left + 14, y = ev.clientY - r.top + 14;
-    const w = tip.offsetWidth;
-    if (x + w > r.width) x = Math.max(0, ev.clientX - r.left - w - 14);
+  // tooltip: title, optional subtitle, then label/value rows; a row with no label is a note
+  function tipPlace(ev) {
+    tip.hidden = false;
+    const r = root.getBoundingClientRect(); const w = tip.offsetWidth, h = tip.offsetHeight;
+    let x = ev.clientX - r.left + 16, y = ev.clientY - r.top + 16;
+    if (ev.clientX + 16 + w > Math.min(r.right, window.innerWidth) - 8) x = Math.max(8, ev.clientX - r.left - w - 16);
+    if (ev.clientY + 16 + h > window.innerHeight - 8) y = Math.max(ev.clientY - r.top - h - 12, -r.top + 8);
     tip.style.left = x + 'px'; tip.style.top = y + 'px';
+  }
+  function tipHead(title, sub) {
+    const hd = document.createElement('div'); hd.className = 'th';
+    const t = document.createElement('div'); t.className = 't'; t.textContent = title; hd.append(t);
+    if (sub) { const st = document.createElement('div'); st.className = 'ts'; st.textContent = sub; hd.append(st); }
+    return hd;
+  }
+  function tipShow(ev, title, lines, sub) {
+    const nodes = [tipHead(title, sub)];
+    const rows = document.createElement('div'); rows.className = 'tr';
+    (lines || []).forEach(([l, v, c]) => {
+      if (!l) { if (v) { const n = document.createElement('div'); n.className = 'tn'; n.textContent = v; rows.append(n); } return; }
+      const d = document.createElement('div'); d.className = 'tl';
+      const lb = document.createElement('span'); lb.className = 'k';
+      if (c) { const i = document.createElement('span'); i.className = 'dot'; i.style.background = c; lb.append(i); }
+      lb.append(l);
+      const b = document.createElement('b'); b.textContent = v;
+      d.append(lb, b); rows.append(d);
+    });
+    if (rows.childNodes.length) nodes.push(rows);
+    tip.className = 'gx-tip'; tip.replaceChildren(...nodes); tipPlace(ev);
+  }
+  // provider list tooltip: logo, name, a meta line and GPU chips per provider
+  function tipProviders(ev, title, sub, provs, o = {}) {
+    const max = o.max || 7; const box = document.createElement('div'); box.className = 'tp';
+    provs.slice(0, max).forEach((p) => {
+      const row = document.createElement('div'); row.className = 'tpr';
+      const nm = document.createElement('div'); nm.className = 'tpn';
+      const b = document.createElement('b'); b.textContent = p.provider; nm.append(logo(p.provider, 'sm'), b);
+      if (o.meta) { const m = o.meta(p); if (m) { const sm = document.createElement('span'); sm.className = 'tpm'; withFlag(sm, p.hq); sm.append(m); nm.append(sm); } }
+      row.append(nm);
+      if (o.gpus) {
+        const g = o.gpus(p); const ch = document.createElement('div'); ch.className = 'tpc';
+        const lim = provs.length === 1 ? 14 : 5;
+        if (g && g.length) { g.slice(0, lim).forEach((k) => { const c = document.createElement('i'); c.textContent = k; if (k === o.hl) c.className = 'on'; ch.append(c); }); if (g.length > lim) { const c = document.createElement('i'); c.className = 'more'; c.textContent = `+${g.length - lim}`; ch.append(c); } }
+        else { const c = document.createElement('i'); c.className = 'more'; c.textContent = 'GPUs not listed'; ch.append(c); }
+        row.append(ch);
+      }
+      box.append(row);
+    });
+    const nodes = [tipHead(title, sub), box];
+    if (provs.length > max) { const n = document.createElement('div'); n.className = 'tf'; n.textContent = `+${provs.length - max} more · tap to see all`; nodes.push(n); }
+    tip.className = 'gx-tip wide'; tip.replaceChildren(...nodes); tipPlace(ev);
   }
   const tipHide = () => { tip.hidden = true; };
 
@@ -124,6 +159,8 @@
   // selected GPU model (null = all models); a chip maker or GPU model turns on "where to rent it" mode
   const famSel = () => { const x = P().family; return x && x !== '__all' && x !== 'null' ? x : null; };
   const chipOn = () => !!(P().vendor || famSel());
+  // GPU models a provider lists, newest first
+  const gpusOf = (p) => { const fi = (cache.v || {}).famInfo; if (!fi) return p.fams; return p.fams.filter((k) => fi.has(k)).sort((a, b) => (fi.get(b).year - fi.get(a).year) || d3.ascending(a, b)); };
   const chipName = () => famSel() || P().vendor || '';
   const sells = (v, p) => { const q = P(); const F = famSel(); return (!F || p.fams.includes(F)) && (!q.vendor || p.fams.some((k) => (v.famInfo.get(k) || {}).vendor === q.vendor)); };
   function filt(v) {
@@ -231,7 +268,7 @@
     const vn = new Map(); v.provs.forEach((p) => new Set(p.fams.map((k) => (v.famInfo.get(k) || {}).vendor).filter(Boolean)).forEach((x) => vn.set(x, (vn.get(x) || 0) + 1)));
     fillSelect(sel.vendor, VENDORS.filter((x) => vn.get(x)).map((x) => [x, `${x} (${vn.get(x)} providers)`]), q.vendor, 'All chips');
     const famN = new Map(); v.provs.forEach((p) => p.fams.forEach((k) => famN.set(k, (famN.get(k) || 0) + 1)));
-    const famOpts = [...v.famInfo.values()].filter((x) => famN.get(x.family) && (!q.vendor || x.vendor === q.vendor)).sort((a, b) => d3.ascending(a.vendor, b.vendor) || b.year - a.year || d3.ascending(a.family, b.family));
+    const famOpts = [...v.famInfo.values()].filter((x) => famN.get(x.family) && (!q.vendor || x.vendor === q.vendor)).sort((a, b) => ((VENDORS.indexOf(a.vendor) + 99) % 99) - ((VENDORS.indexOf(b.vendor) + 99) % 99) || b.year - a.year || (famN.get(b.family) - famN.get(a.family)));
     fillSelect(sel.family, famOpts.map((x) => [x.family, `${x.family} · ${x.vendor} (${famN.get(x.family)})`]), famSel(), q.vendor ? `All ${q.vendor} models` : 'All models');
     const uniq = (k) => [...new Set(v.provs.map((p) => p[k]))].filter(Boolean).sort();
     fillSelect(sel.region, uniq('region').filter((r) => r !== 'Unknown').map((r) => [r, r]), q.region, 'All regions');
@@ -244,6 +281,7 @@
     fillSelect(sel.ownership, OWN.map((o) => [o[0], o[1]]), q.ownership, 'Any ownership');
     if (qIn !== document.activeElement) qIn.value = q.q || '';
     const nSet = ['vendor', 'region', 'country', 'category', 'ownership', 'city'].filter((k) => q[k]).length + (famSel() ? 1 : 0);
+    const rb = $('#f-reset'); rb.classList.toggle('is-active', nSet > 0 || !!q.q); rb.querySelector('span').textContent = nSet ? `Reset (${nSet})` : 'Reset';
     const fc = $('#f-count'); fc.hidden = !nSet; fc.textContent = String(nSet); $('#f-toggle').setAttribute('aria-label', nSet ? `Filters, ${nSet} active` : 'Filters');
     const chips = $('#f-chips'); const list = [];
     if (q.city) list.push(['Data center in ' + q.city, { city: null }]);
@@ -382,7 +420,8 @@
       .attr('stroke', 'var(--gx-border)').attr('stroke-opacity', 0.45).attr('stroke-width', 0.35).attr('vector-effect', 'non-scaling-stroke')
       .style('cursor', (d) => (agg.has(d.country) || dcN.has(d.country) ? 'pointer' : null))
       .on('mousemove', (e, d) => { if (!chip) return countryTip(e, d); const ps = dcN.get(d.country); const a = agg.get(d.country); if (!ps && !a) return tipHide();
-        tipShow(e, d.country, [[`Sell ${chipName()} with a data center here`, ps ? String(ps.size) : '0'], ['', ps ? trunc([...ps].sort((a, b) => ((v.byName.get(b) || {}).op || 0) - ((v.byName.get(a) || {}).op || 0)).slice(0, 8).join(', ') + (ps.size > 8 ? ` +${ps.size - 8} more` : ''), 220) : ''], [`Headquartered here, sell ${chipName()}`, a ? String(a.n) : '0']]); })
+        if (!ps) return tipShow(e, d.country, [[`HQs selling ${chipName()}`, String(a.n)], ['', 'No data center city named here']]);
+        tipProviders(e, d.country, `${ps.size} provider${ps.size === 1 ? '' : 's'} selling ${chipName()} with a data center here`, [...ps].map((n) => v.byName.get(n)).filter(Boolean).sort((x, y) => (y.op || 0) - (x.op || 0)), { gpus: gpusOf, hl: famSel(), meta: (p) => p.hq, max: 6 }); })
       .on('mouseleave', tipHide)
       .on('click', (e, d) => (agg.has(d.country) || dcN.has(d.country)) && set({ country: q.country === d.country ? null : d.country, city: null }));
     g.selectAll('path').filter((d) => d && d.country === q.country).raise();
@@ -408,21 +447,16 @@
       .attr('stroke', (d) => (isOn(d) ? 'var(--color-fg)' : 'var(--gx-border)'))
       .style('cursor', 'pointer')
       .on('click', (e, d) => { if (!pv) set({ city: q.city === d.city ? null : d.city }); })
-      .on('mousemove', (e, d) => (pv ? tipShow(e, `${d.city}, ${d.country}`, [['Data center of', pv.provider], ['Headquarters', hqPlace(pv, true)]]) : tipShow(e, `${d.city}, ${d.country}`, [['Providers with a data center here', String(d.n)], ['', trunc(d.provs.slice(0, 8).join(', ') + (d.n > 8 ? ` +${d.n - 8} more` : ''), 220)]])))
+      .on('mousemove', (e, d) => (pv ? tipShow(e, `${d.city}, ${d.country}`, [['Data center of', pv.provider], ['Headquarters', hqPlace(pv, true)]], 'Data center city') : tipProviders(e, `${d.city}, ${d.country}`, `${d.n} provider${d.n === 1 ? '' : 's'}${chipOn() ? ' selling ' + chipName() : ''} with a data center here`, d.provs.map((n) => v.byName.get(n)).filter(Boolean).sort((a, b) => (b.op || 0) - (a.op || 0)), { gpus: gpusOf, hl: famSel(), meta: (p) => p.hq, max: 6 })))
       .on('mouseleave', tipHide);
     // provider HQ points (providers layer): one point per HQ city, tooltip lists each provider's GPUs
     const hqPts = !pv && m === 'providers' ? d3.groups(f.provs.filter((p) => p.hq_px != null && p.hq_px !== ''), (p) => p.hq_city + '|' + p.hq)
       .map(([k, a]) => ({ k, city: a[0].hq_city, place: hqPlace(a[0], true), country: a[0].hq, x: +a[0].hq_px, y: +a[0].hq_py, provs: a.sort((x, y) => (y.op || 0) - (x.op || 0) || d3.ascending(x.provider, y.provider)) }))
       .sort((a, b) => b.provs.length - a.provs.length) : [];
     const hqR = (d) => Math.min(7, 2.4 + Math.sqrt(d.provs.length) * 1.1);
-    const gpuList = (p) => { const fs = p.fams.filter((k) => v.famInfo.has(k)).sort((a, b) => (v.famInfo.get(b).year - v.famInfo.get(a).year) || d3.ascending(a, b)); return fs.length ? fs : null; };
     const hqTip = (e, d) => {
       const F = famSel();
-      const lines = d.provs.length === 1
-        ? (() => { const g = gpuList(d.provs[0]); return [['GPUs offered', g ? trunc(g.join(', '), 260) : 'not specified']]; })()
-        : d.provs.slice(0, 8).map((p) => { const g = gpuList(p); return [p.provider, g ? trunc(g.slice(0, 6).join(', ') + (g.length > 6 ? ` +${g.length - 6}` : ''), 90) : 'GPUs not specified']; })
-          .concat(d.provs.length > 8 ? [['', `+${d.provs.length - 8} more providers headquartered here`]] : []);
-      tipShow(e, d.provs.length === 1 ? `${d.provs[0].provider} · HQ ${d.place}` : `HQ in ${d.place} · ${d.provs.length} providers${F ? ' selling ' + F : ''}`, lines);
+      tipProviders(e, d.provs.length === 1 ? d.provs[0].provider : `HQ in ${d.place}`, d.provs.length === 1 ? `Headquarters · ${d.place}` : `${d.provs.length} providers${F ? ' selling ' + F : ''} headquartered here`, d.provs, { gpus: gpusOf, hl: F, max: 6 });
     };
     const hqDots = g.append('g').attr('class', 'hqpts').selectAll('circle').data(hqPts).join('circle')
       .attr('cx', (d) => d.x).attr('cy', (d) => d.y)
@@ -1206,6 +1240,98 @@
   /* ---------- orchestrate ---------- */
   const CHARTS = ['#map', '#strip', '#pgroup', '#mw', '#own', '#mwc', '#avail', '#gen', '#heat'];
   let jumped = false;
+  /* ---------- dropdowns: native select kept for state, custom menu on mouse devices ---------- */
+  const fineHover = window.matchMedia('(hover: hover) and (pointer: fine)');
+  const DD = [];
+  let ddOpen = null;
+  const ddPop = document.createElement('div'); ddPop.className = 'gx-dd-pop'; ddPop.hidden = true; ddPop.setAttribute('role', 'listbox'); root.append(ddPop);
+  // "H100 · NVIDIA (258)" -> main "H100", sub "NVIDIA", count "258"
+  function ddParts(t) {
+    const m = String(t).match(/^(.*?)\s*\(([\d,]+)(?:\s+[a-z ]+)?\)\s*$/i); let main = m ? m[1] : String(t); const cnt = m ? m[2] : '';
+    const i = main.indexOf(' · '); const sub = i > 0 ? main.slice(i + 3) : ''; if (i > 0) main = main.slice(0, i);
+    return { main, sub, cnt };
+  }
+  function ddSync(d) {
+    const o = d.sel.options[d.sel.selectedIndex]; const pp = ddParts(o ? o.textContent : '');
+    d.val.textContent = pp.main; d.btn.title = o ? o.textContent : '';
+    d.wrap.classList.toggle('dd-on', fineHover.matches);
+  }
+  function ddClose(focusBtn) {
+    if (!ddOpen) return; const d = ddOpen; ddOpen = null; ddPop.hidden = true; d.btn.setAttribute('aria-expanded', 'false'); d.wrap.classList.remove('dd-open');
+    if (focusBtn) d.btn.focus();
+  }
+  function ddRender(d, q) {
+    const ql = (q || '').toLowerCase(); const items = [];
+    [...d.sel.options].forEach((o, i) => {
+      if (ql && !o.textContent.toLowerCase().includes(ql)) return;
+      const pp = ddParts(o.textContent);
+      const it = document.createElement('div'); it.className = 'gx-dd-opt' + (i === d.sel.selectedIndex ? ' sel' : '') + (o.value === '' || o.value === '__all' ? ' all' : '');
+      it.setAttribute('role', 'option'); it.setAttribute('aria-selected', String(i === d.sel.selectedIndex)); it.dataset.i = i; it.id = 'dd-o-' + i;
+      const ck = document.createElement('span'); ck.className = 'ck'; ck.append(ICON('check'));
+      const tx = document.createElement('span'); tx.className = 'tx'; const mn = document.createElement('b'); mn.textContent = pp.main; tx.append(mn);
+      if (pp.sub) { const sb = document.createElement('small'); sb.textContent = pp.sub; tx.append(sb); }
+      it.append(ck, tx);
+      if (pp.cnt) { const c = document.createElement('em'); c.textContent = pp.cnt; it.append(c); }
+      it.addEventListener('mousedown', (e) => e.preventDefault());
+      it.addEventListener('click', () => ddPick(d, i));
+      items.push(it);
+    });
+    if (!items.length) { const n = document.createElement('div'); n.className = 'gx-dd-empty'; n.textContent = 'No matches'; items.push(n); }
+    d.list.replaceChildren(...items);
+    d.act = Math.max(0, items.findIndex((x) => x.classList.contains('sel'))); ddActive(d);
+  }
+  function ddActive(d) {
+    const os = [...d.list.querySelectorAll('.gx-dd-opt')]; os.forEach((o, i) => o.classList.toggle('act', i === d.act));
+    const a = os[d.act]; if (a) { a.scrollIntoView({ block: 'nearest' }); (d.search || d.btn).setAttribute('aria-activedescendant', a.id); }
+  }
+  function ddPick(d, i) { ddClose(true); if (d.sel.selectedIndex !== i) { d.sel.selectedIndex = i; d.sel.dispatchEvent(new Event('change', { bubbles: true })); } ddSync(d); }
+  function ddOpenFor(d) {
+    if (ddOpen === d) { ddClose(true); return; } ddClose(); ddOpen = d;
+    const many = d.sel.options.length > 10;
+    ddPop.replaceChildren(); d.search = null;
+    if (many) {
+      const sw = document.createElement('div'); sw.className = 'gx-dd-search'; sw.append(ICON('search'));
+      const si = document.createElement('input'); si.type = 'search'; si.placeholder = 'Search…'; si.setAttribute('aria-label', 'Search options'); si.autocomplete = 'off';
+      si.addEventListener('input', () => ddRender(d, si.value)); si.addEventListener('keydown', (e) => ddKey(e, d));
+      sw.append(si); ddPop.append(sw); d.search = si;
+    }
+    d.list = document.createElement('div'); d.list.className = 'gx-dd-list'; ddPop.append(d.list);
+    ddRender(d, '');
+    ddPop.hidden = false; d.btn.setAttribute('aria-expanded', 'true'); d.wrap.classList.add('dd-open');
+    const rr = root.getBoundingClientRect(), br = d.wrap.getBoundingClientRect();
+    const w = Math.max(br.width, d.compact ? 180 : 260);
+    let left = br.left - rr.left; if (br.left + w > window.innerWidth - 8) left = Math.max(8, window.innerWidth - 8 - w - rr.left);
+    ddPop.style.minWidth = w + 'px'; ddPop.style.left = left + 'px';
+    const below = window.innerHeight - br.bottom; const h = Math.min(380, Math.max(below, br.top) - 16);
+    ddPop.style.maxHeight = h + 'px';
+    if (below < 260 && br.top > below) { ddPop.style.top = ''; ddPop.style.bottom = (rr.bottom - br.top + 6) + 'px'; } else { ddPop.style.bottom = ''; ddPop.style.top = (br.bottom - rr.top + 6) + 'px'; }
+    ddActive(d);
+    if (d.search) d.search.focus();
+  }
+  function ddKey(e, d) {
+    const os = d.list ? [...d.list.querySelectorAll('.gx-dd-opt')] : [];
+    if (e.key === 'ArrowDown') { e.preventDefault(); if (ddOpen !== d) return ddOpenFor(d); d.act = Math.min(os.length - 1, d.act + 1); ddActive(d); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); if (ddOpen !== d) return ddOpenFor(d); d.act = Math.max(0, d.act - 1); ddActive(d); }
+    else if (e.key === 'Enter' || (e.key === ' ' && e.target === d.btn)) { e.preventDefault(); if (ddOpen !== d) return ddOpenFor(d); const o = os[d.act]; if (o) ddPick(d, +o.dataset.i); }
+    else if (e.key === 'Escape') { if (ddOpen === d) { e.preventDefault(); e.stopPropagation(); ddClose(true); } }
+    else if (e.key === 'Tab') ddClose();
+  }
+  document.querySelectorAll('.gx-f select, .gx-sort select').forEach((sel) => {
+    const wrap = sel.closest('.gx-f, .gx-sort');
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'gx-dd-btn';
+    btn.setAttribute('aria-haspopup', 'listbox'); btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-label', sel.getAttribute('aria-label') || '');
+    const val = document.createElement('span'); val.className = 'v'; btn.append(val);
+    sel.after(btn);
+    const d = { sel, wrap, btn, val, compact: wrap.classList.contains('gx-sort'), act: 0 };
+    btn.addEventListener('click', (e) => { e.preventDefault(); ddOpenFor(d); });
+    btn.addEventListener('keydown', (e) => ddKey(e, d));
+    sel.addEventListener('change', () => ddSync(d));
+    DD.push(d); ddSync(d);
+  });
+  document.addEventListener('mousedown', (e) => { if (ddOpen && !ddPop.contains(e.target) && !ddOpen.wrap.contains(e.target)) ddClose(); });
+  window.addEventListener('resize', () => ddClose());
+  fineHover.addEventListener && fineHover.addEventListener('change', () => DD.forEach(ddSync));
+  const ddSyncAll = () => DD.forEach(ddSync);
   const render = () => {
     const core = ['providers', 'prices', 'gpu_families'].map((id) => dash.data(id).status);
     const bad = core.some((s) => s === 'error' || s === 'connect' || s === 'declined' || s === 'missing');
@@ -1228,6 +1354,7 @@
     if (tab === 'capacity') { drawMW(f); drawOwn(f); drawMWC(f); insCapacity(f); }
     if (tab === 'hardware') { drawAvail(v, f); drawGen(v, f); drawHeat(v, f); insHardware(v, f); }
     if (tab === 'directory') { drawDir(f); drawDetail(v); }
+    ddSyncAll();
     if (!jumped) { jumped = true; const h = location.hash.slice(1); if (TABS.includes(h) && h !== tab) set({ tab: h }); }
   };
   dash.onData(render);
