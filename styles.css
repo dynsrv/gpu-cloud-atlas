@@ -1096,6 +1096,10 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 @media (min-width:981px){.gx-kpi{min-height:152px!important}}
 .gx-mapnote{margin:-4px 0 0;padding:0;font-size:var(--t-xs);line-height:1.5;color:var(--color-fg-muted)}
 #map-card.pv-on #map-note{display:none}
+.gx-kpi .kic{width:38px!important;height:38px!important;top:14px!important;right:14px!important}
+.gx-kpi .kic .i{width:21px!important;height:21px!important;stroke-width:1.7}
+.gx-kpi .lab{padding-right:46px!important}
+@media (max-width:720px){.gx-kpi .kic{width:32px!important;height:32px!important;top:10px!important;right:10px!important}.gx-kpi .kic .i{width:18px!important;height:18px!important}.gx-kpi .lab{padding-right:38px!important}}
 /* ===== Quick views ===== */
 .gx-quick{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-22px 0 -16px}
 .gx-quick .ql{font-size:13px;font-weight:500;color:var(--color-fg-muted);margin-right:2px}
