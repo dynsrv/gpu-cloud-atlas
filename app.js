@@ -1743,7 +1743,7 @@
     const cd = all.filter((d) => anyN || d.e.N === 1).sort((a, b) => b.x - a.x); const hiddenMulti = all.length - cd.length;
     const mx = d3.max(cd, (d) => d.x) || 1; const ch = $('#tok-chart'); ch.replaceChildren();
     const fT = (x) => (x >= 100 ? fInt(Math.round(x / 10) * 10) : x >= 10 ? fInt(Math.round(x)) : x.toFixed(1));
-    $('#tok-sub').textContent = `${m.name} (${m.short}) · ${B === 1 ? 'speed one user sees, tokens generated per second' : 'total tokens per second while serving 32 users at once'} · ${TOK_CTX.toLocaleString()}-token context · ${plural(cd.length, 'GPU')}${anyN ? ' · multi-GPU rows show the whole setup' : ''}`;
+    $('#sheet-chart-sub').textContent = `${m.name} (${m.short}) · ${B === 1 ? 'speed one user sees, tokens generated per second' : 'total tokens per second while serving 32 users at once'} · ${TOK_CTX.toLocaleString()}-token context · ${plural(cd.length, 'GPU')}${anyN ? ' · multi-GPU rows show the whole setup' : ''}`;
     cd.forEach((d, i) => {
       const row = mkEl('button', 'gx-shr gx-tokr'); row.type = 'button';
       row.title = `${d.r.model}: ${d.e.prec} on ${plural(d.e.N, 'GPU')}, ${d.e.bound}. Open the datasheet.`;
@@ -1756,7 +1756,7 @@
     });
     if (!cd.length) ch.append(mkEl('p', 'gx-note', hiddenMulti ? 'No GPU in this view can hold this model on its own.' : 'No GPU in this view has the memory, bandwidth and compute figures needed for an estimate.'));
     if (hiddenMulti) { const more = mkEl('button', 'gx-linkbtn gx-tokmore', `${plural(hiddenMulti, 'more GPU')} need 2 to 8 GPUs for this model. Show them`); more.type = 'button'; more.onclick = () => set({ tkg: 'any' }); ch.append(more); }
-    const lg = $('#tok-legend'); lg.replaceChildren(); VENDORS.filter((x) => cd.some((d) => d.r.vendor === x)).forEach((x) => { const s2 = mkEl('span'); const i = mkEl('i'); i.style.background = vColor(x); s2.append(i, document.createTextNode(x)); lg.append(s2); });
+    const lg = $('#sheet-legend'); lg.replaceChildren(); VENDORS.filter((x) => cd.some((d) => d.r.vendor === x)).forEach((x) => { const s2 = mkEl('span'); const i = mkEl('i'); i.style.background = vColor(x); s2.append(i, document.createTextNode(x)); lg.append(s2); });
     const how = $('#tok-how'); if (!how.childElementCount) {
       const ul = mkEl('ul');
       [
@@ -1771,14 +1771,16 @@
   }
   function drawRank(S, list, q) {
     const mk = GMET.find((m) => m[0] === q.gmetric) || GMET[2]; const k = mk[0];
-    const mb = $('#sheet-metric'); mb.replaceChildren(); GMET.forEach((m) => { const b = mkEl('button', null, m[1]); b.type = 'button'; b.setAttribute('aria-pressed', String(m[0] === k)); b.onclick = () => set({ gmetric: m[0] }); mb.append(b); });
-    const asc = k === 'tdp_w'; const cd = list.map((r) => ({ r, x: gv(r, k) })).filter((d) => d.x != null).sort((a, b) => (asc ? a.x - b.x : b.x - a.x));
-    const mx = d3.max(cd, (d) => d.x) || 1; const ch = $('#sheet-chart'); ch.replaceChildren();
-    $('#sheet-chart-sub').textContent = `${mk[1]} (${UNIT[k]}) · ${asc ? 'lowest first' : 'highest first'} · ${plural(cd.length, 'GPU')} with a published figure${cd.length < list.length ? `, ${list.length - cd.length} without` : ''}`;
-    cd.forEach((d, i) => { const row = mkEl('button', 'gx-shr'); row.type = 'button'; row.title = `Open ${d.r.model}`; const nm = mkEl('span', 'nm'); const dot = mkEl('i'); dot.style.background = vColor(d.r.vendor); nm.append(mkEl('em', null, String(i + 1)), dot, document.createTextNode(d.r.model)); const bar = mkEl('span', 'bar'); const f = mkEl('span'); f.style.width = Math.max(1.5, (d.x / mx) * 100) + '%'; f.style.background = vColor(d.r.vendor); bar.append(f); row.append(nm, bar, mkEl('span', 'val', fnum(d.x))); row.onclick = () => selectGpu(d.r.model); ch.append(row); });
-    if (!cd.length) ch.append(mkEl('p', 'gx-note', 'No GPU in this view has a published figure for this metric.'));
-    drawTok(list, q);
-    const lg = $('#sheet-legend'); lg.replaceChildren(); VENDORS.filter((x) => cd.some((d) => d.r.vendor === x)).forEach((x) => { const s2 = mkEl('span'); const i = mkEl('i'); i.style.background = vColor(x); s2.append(i, document.createTextNode(x)); lg.append(s2); });
+    const isTok = q.gmetric === 'tok'; const mb = $('#sheet-metric'); mb.replaceChildren(); [...GMET.map((m) => [m[0], m[1]]), ['tok', 'Token']].forEach(([id, lab]) => { const b = mkEl('button', null, lab); b.type = 'button'; if (id === 'tok') b.className = 'gx-tokbtn'; b.setAttribute('aria-pressed', String(isTok ? id === 'tok' : id === k)); b.onclick = () => set({ gmetric: id === GMET[2][0] ? null : id }); mb.append(b); });
+    $('#sheet-chart').hidden = isTok; $('#tok-pane').hidden = !isTok;
+    if (isTok) drawTok(list, q); else {
+      const asc = k === 'tdp_w'; const cd = list.map((r) => ({ r, x: gv(r, k) })).filter((d) => d.x != null).sort((a, b) => (asc ? a.x - b.x : b.x - a.x));
+      const mx = d3.max(cd, (d) => d.x) || 1; const ch = $('#sheet-chart'); ch.replaceChildren();
+      $('#sheet-chart-sub').textContent = `${mk[1]} (${UNIT[k]}) · ${asc ? 'lowest first' : 'highest first'} · ${plural(cd.length, 'GPU')} with a published figure${cd.length < list.length ? `, ${list.length - cd.length} without` : ''}`;
+      cd.forEach((d, i) => { const row = mkEl('button', 'gx-shr'); row.type = 'button'; row.title = `Open ${d.r.model}`; const nm = mkEl('span', 'nm'); const dot = mkEl('i'); dot.style.background = vColor(d.r.vendor); nm.append(mkEl('em', null, String(i + 1)), dot, document.createTextNode(d.r.model)); const bar = mkEl('span', 'bar'); const f = mkEl('span'); f.style.width = Math.max(1.5, (d.x / mx) * 100) + '%'; f.style.background = vColor(d.r.vendor); bar.append(f); row.append(nm, bar, mkEl('span', 'val', fnum(d.x))); row.onclick = () => selectGpu(d.r.model); ch.append(row); });
+      if (!cd.length) ch.append(mkEl('p', 'gx-note', 'No GPU in this view has a published figure for this metric.'));
+      const lg = $('#sheet-legend'); lg.replaceChildren(); VENDORS.filter((x) => cd.some((d) => d.r.vendor === x)).forEach((x) => { const s2 = mkEl('span'); const i = mkEl('i'); i.style.background = vColor(x); s2.append(i, document.createTextNode(x)); lg.append(s2); });
+    }
     const sk = SCOLS.some((c) => c[0] === q.gsort) ? q.gsort : null, dir = q.gdir === 'asc' ? 'asc' : 'desc';
     let tl = list.slice(); if (sk) tl.sort((a, b) => { const tx = sk === 'model' || sk === 'arch'; const x = tx ? String(a[sk] || '').toLowerCase() : a[sk], y = tx ? String(b[sk] || '').toLowerCase() : b[sk]; if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1; return dir === 'asc' ? d3.ascending(x, y) : d3.descending(x, y); });
     document.querySelectorAll('#sheet thead th').forEach((th) => { const b = th.querySelector('button[data-s]'); if (b) th.setAttribute('aria-sort', b.dataset.s === sk ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'); });

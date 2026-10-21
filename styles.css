@@ -1513,3 +1513,8 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .gx-tokr .val>span small{font-size:12px;font-weight:400;color:var(--color-fg-muted)}
 .gx-tokmore{align-self:flex-start;margin:8px 8px 0;padding:6px 0;border:0;background:none;color:var(--gx-gblue);font:inherit;font-size:var(--t-sm);font-weight:500;cursor:pointer;text-align:left}
 .gx-tokmore:hover{text-decoration:underline}
+
+.gx-tokpane{display:flex;flex-direction:column;gap:12px}
+.gx-tokpane[hidden]{display:none}
+.gx-tokctl{align-items:center}
+.gx-tokctl .gx-est{margin:0}

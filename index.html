@@ -289,12 +289,11 @@
           <div class="gx-ch"><div><h3>Rank GPUs by one metric</h3><p class="gx-note" id="sheet-chart-sub"></p></div><div class="gx-legend" id="sheet-legend"></div></div>
           <div class="gx-seg" id="sheet-metric" role="group" aria-label="Metric"></div>
           <div class="gx-shchart" id="sheet-chart"></div>
-        </div>
-        <div class="gx-card" id="tok-card">
-          <div class="gx-ch"><div><h3>Tokens per second <span class="gx-est">Synthetic estimate</span></h3><p class="gx-note" id="tok-sub"></p></div><div class="gx-legend" id="tok-legend"></div></div>
-          <div class="gx-tokctl"><div class="gx-seg" id="tok-model" role="group" aria-label="Open-source model"></div><div class="gx-seg" id="tok-load" role="group" aria-label="Concurrent users"></div><div class="gx-seg" id="tok-gpus" role="group" aria-label="GPUs per setup"></div></div>
-          <div class="gx-shchart" id="tok-chart"></div>
-          <details class="gx-how"><summary>How this is estimated</summary><div id="tok-how"></div></details>
+          <div id="tok-pane" class="gx-tokpane" hidden>
+            <div class="gx-tokctl"><span class="gx-est">Synthetic estimate</span><div class="gx-seg" id="tok-model" role="group" aria-label="Open-source model"></div><div class="gx-seg" id="tok-load" role="group" aria-label="Concurrent users"></div><div class="gx-seg" id="tok-gpus" role="group" aria-label="GPUs per setup"></div></div>
+            <div class="gx-shchart" id="tok-chart"></div>
+            <details class="gx-how"><summary>How this is estimated</summary><div id="tok-how"></div></details>
+          </div>
         </div>
         <div class="gx-card" style="padding:0;gap:0">
           <p class="gx-note" style="padding:var(--s3) var(--s4)">Select a row for the full datasheet. Tick the box to add it to compare.</p>
