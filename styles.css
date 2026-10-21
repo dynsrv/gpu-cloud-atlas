@@ -1527,3 +1527,6 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 /* rankings table: numeric columns centred, header and values on the same axis */
 #sheet th.n,#sheet td.n{text-align:center!important}
 #sheet th.n button,#sheet th.n>*{margin-inline:auto;justify-content:center!important;text-align:center!important}
+
+.gx-shchart>.gx-shr{flex:none;height:auto}
+@media (max-width:720px){.gx-shr.gx-tokr{align-items:start}.gx-tokr .tk{white-space:normal}}
