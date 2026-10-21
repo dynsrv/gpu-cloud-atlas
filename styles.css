@@ -976,3 +976,82 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
     padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:var(--color-panel);box-shadow:0 -10px 18px -14px rgba(15,23,42,.35)}
   .gx-filters.open .gx-ffoot #f-reset,.gx-filters.open .gx-ffoot .gx-done{position:static!important;margin:0!important;box-shadow:none!important;width:100%}
 }
+
+/* active extra filters (e.g. data center city) as a row under the filter bar */
+.gx-fchips{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.gx-fchips[hidden]{display:none!important}
+.gx-fchips .fcl{font-size:12px;color:var(--color-fg-muted)}
+.gx-fchips button{all:unset;display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 6px 0 12px;border-radius:999px;cursor:pointer;
+  background:color-mix(in srgb,var(--gx-gblue) 11%,var(--color-panel));border:1px solid color-mix(in srgb,var(--gx-gblue) 30%,transparent);color:var(--gx-gblue);font-size:13px;font-weight:600}
+.gx-fchips button small{font-weight:500;color:var(--color-fg-muted)}
+.gx-fchips button .i{width:14px;height:14px;padding:2px;border-radius:50%;background:color-mix(in srgb,var(--gx-gblue) 16%,transparent)}
+.gx-fchips button:hover{border-color:var(--gx-gblue)}
+@media (max-width:720px){.gx-fchips{display:none!important}}
+
+/* ===== provider profile ===== */
+#detail.gx-dpanel,#detail{gap:18px}
+.gx-pf-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.gx-pf-id{display:flex;align-items:center;gap:14px;min-width:0}
+.gx-pf-id .gx-logo.lg,.gx-pf-id .gx-logo{width:44px!important;height:44px!important;margin:0!important;border-radius:12px!important;font-size:15px!important;flex:none}
+.gx-pf-id .gx-logo img{width:30px;height:30px}
+.gx-pf-id h3{margin:0;font-size:22px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
+.gx-pf-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-top:4px;font-size:13px;color:var(--color-fg-muted)}
+.gx-pf-meta span{display:inline-flex;align-items:center;gap:6px}
+.gx-pf-meta .flag{margin:0}
+.gx-pf-meta .i{width:14px;height:14px;color:var(--gx-gblue)}
+.gx-pf-act{display:flex;align-items:center;gap:8px;flex:none}
+.gx-pf-act a{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:var(--r-sm);text-decoration:none;font-size:13px;font-weight:600;
+  color:var(--gx-gblue);background:color-mix(in srgb,var(--gx-gblue) 9%,var(--color-panel));border:1px solid color-mix(in srgb,var(--gx-gblue) 40%,var(--gx-line))}
+.gx-pf-act a:hover{background:var(--gx-gblue);color:var(--gx-gblue-ink)}
+.gx-pf-act .gx-ibtn{width:36px;height:36px;border-radius:var(--r-sm);border:1px solid var(--gx-line);background:var(--color-panel)}
+.gx-pf-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:1px solid var(--gx-line);border-radius:var(--r-md);overflow:hidden;background:var(--color-bg)}
+.gx-pf-stats div{display:flex;flex-direction:column;gap:2px;padding:12px 16px;border-left:1px solid var(--gx-line)}
+.gx-pf-stats div:first-child{border-left:0}
+.gx-pf-stats em{font-style:normal;font-size:12px;color:var(--color-fg-muted)}
+.gx-pf-stats strong{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.gx-pf-sec{display:flex;flex-direction:column;gap:10px}
+.gx-pf-sec>h4{margin:0;font-size:var(--t-md);font-weight:600;color:var(--gx-gblue)}
+.gx-pf-cities{display:flex;flex-direction:column;gap:8px}
+.gx-pf-cities .grp{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.gx-pf-cities .ctry{display:inline-flex;align-items:center;gap:6px;min-width:9.5rem;font-size:12px;font-weight:600;color:var(--color-fg-muted)}
+.gx-pf-cities .ctry .flag{margin:0}
+.gx-pf-cities button{all:unset;cursor:pointer;padding:3px 10px;border-radius:999px;font-size:12.5px;border:1px solid var(--gx-line);background:var(--color-panel);color:var(--color-fg)}
+.gx-pf-cities button:hover,.gx-pf-cities button.on{border-color:var(--gx-gblue);color:var(--gx-gblue);background:color-mix(in srgb,var(--gx-gblue) 8%,var(--color-panel))}
+.gx-linkbtn.more{align-self:flex-start}
+.gx-ptable td,.gx-ptable th{padding:10px 12px!important;vertical-align:top}
+.gx-ptable td:first-child{font-weight:600;white-space:nowrap}
+.gx-ptable td.pt{color:var(--color-fg-muted);font-size:12.5px;line-height:1.5}
+.gx-ptable td.n{font-weight:600;white-space:nowrap}
+.gx-ptable tr.np td.n{color:var(--color-fg-muted);font-weight:400}
+.gx-ptable .basis{display:block;margin-top:2px;font-weight:400;font-size:11.5px;color:var(--color-fg-muted)}
+@media (max-width:900px){.gx-pf-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.gx-pf-stats div:nth-child(4){border-left:0}.gx-pf-stats div:nth-child(n+4){border-top:1px solid var(--gx-line)}}
+@media (max-width:720px){
+  .gx-pf-head{gap:10px}
+  .gx-pf-id h3{font-size:19px}
+  .gx-pf-act a span{display:none}
+  .gx-pf-act a{width:36px;padding:0;justify-content:center}
+  .gx-pf-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .gx-pf-stats div{border-left:0;border-top:1px solid var(--gx-line)}
+  .gx-pf-stats div:nth-child(-n+2){border-top:0}
+  .gx-pf-stats div:nth-child(even){border-left:1px solid var(--gx-line)}
+  .gx-pf-stats div:last-child:nth-child(odd){grid-column:1/-1}
+  .gx-pf-cities .ctry{min-width:0;width:100%}
+  /* price table becomes stacked cards */
+  .gx-ptable thead{display:none}
+  .gx-ptable,.gx-ptable tbody{display:block}
+  .gx-ptable tr{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:12px 4px;border-bottom:1px solid var(--gx-line)}
+  .gx-ptable td{display:block;padding:0!important;border:0!important}
+  .gx-ptable td.pt{grid-column:1/-1;order:3}
+  .gx-ptable td:first-child{white-space:normal}
+  #detail .gx-tablebox{max-height:none!important;border-top:0}
+}
+
+.gx-ptable th{padding:0!important}
+.gx-ptable th>span{padding:10px 12px!important}
+@media (max-width:720px){
+  .gx-pf-id{align-items:flex-start;gap:12px}
+  .gx-pf-id .gx-logo.lg,.gx-pf-id .gx-logo{width:40px!important;height:40px!important}
+  .gx-pf-meta{gap:4px 12px;font-size:12.5px;line-height:1.4}
+  .gx-pf-meta span{align-items:flex-start}
+  .gx-pf-meta .flag,.gx-pf-meta .i{margin-top:2px}
+}

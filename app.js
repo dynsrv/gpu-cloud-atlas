@@ -40,7 +40,7 @@
   const nav = document.querySelector('.gx-nav'), fBox = $('#filters'), fTog = $('#f-toggle'), scrim = $('#f-scrim'), mbar = document.querySelector('.gx-mbar');
   const searchLab = document.querySelector('.gx-search'), searchHome = searchLab.nextSibling;
   const phone = matchMedia('(max-width:720px)');
-  const placeSearch = () => { if (phone.matches) { if (searchLab.parentNode !== mbar) { mbar.prepend(searchLab); searchLab.classList.add('gx-msearch'); } } else if (searchLab.parentNode !== fBox) { fBox.insertBefore(searchLab, $('#f-reset')); searchLab.classList.remove('gx-msearch'); } };
+  const placeSearch = () => { if (phone.matches) { if (searchLab.parentNode !== mbar) { mbar.prepend(searchLab); searchLab.classList.add('gx-msearch'); } } else if (searchLab.parentNode !== fBox) { fBox.insertBefore(searchLab, fBox.querySelector('.gx-ffoot')); searchLab.classList.remove('gx-msearch'); } };
   placeSearch(); (phone.addEventListener ? phone.addEventListener('change', placeSearch) : phone.addListener(placeSearch));
   const sheet = (open) => { fBox.classList.toggle('open', open); scrim.hidden = !open; fTog.setAttribute('aria-expanded', String(open)); document.documentElement.style.overflow = open && phone.matches ? 'hidden' : ''; if (open) { const f = phone.matches ? $('#f-close') : fBox.querySelector('.gx-dd-btn'); if (f) f.focus({ preventScroll: true }); } else fTog.focus({ preventScroll: true }); };
   fTog.addEventListener('click', () => sheet(true));
@@ -189,6 +189,7 @@
   }
   // 'All models' is stored as __all and shown in text as "any GPU"
   const ANY_GPU = 'any GPU';
+  const plural = (n, w) => `${fInt(n)} ${w}${n === 1 ? '' : 's'}`;
   // picking a chip maker keeps the GPU focus only if it is one of that maker's chips
   function vendorChange(vd) {
     const v = cache.v; const fam = P().family;
@@ -293,9 +294,10 @@
     const rb = $('#f-reset'); rb.classList.toggle('is-active', nSet > 0 || !!q.q); rb.querySelector('span').textContent = nSet ? `Reset (${nSet})` : 'Reset';
     const fc = $('#f-count'); fc.hidden = !nSet; fc.textContent = String(nSet); $('#f-toggle').setAttribute('aria-label', nSet ? `Filters, ${nSet} active` : 'Filters');
     const chips = $('#f-chips'); const list = [];
-    if (q.city) list.push(['Data center in ' + q.city, { city: null }]);
+    if (q.city) list.push(['Data center city: ' + q.city, { city: null }]);
     chips.hidden = !list.length;
-    chips.replaceChildren(...list.map(([t, clr]) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'gx-chip'; b.textContent = t + '  ×'; b.setAttribute('aria-label', 'Clear ' + t); b.onclick = () => set(clr); return b; }));
+    const cl = document.createElement('span'); cl.className = 'fcl'; cl.textContent = 'Also filtered by';
+    chips.replaceChildren(...(list.length ? [cl] : []), ...list.map(([t, clr]) => { const b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-label', 'Clear ' + t); const s2 = document.createElement('span'); s2.textContent = t; b.append(s2, ICON('x')); b.onclick = () => set(clr); return b; }));
     document.querySelectorAll('#metric button').forEach((b) => { const on = (q.metric || 'providers') === b.dataset.m; b.setAttribute('aria-checked', String(on)); b.tabIndex = on ? 0 : -1; });
     document.querySelectorAll('#pg-seg button').forEach((b) => b.setAttribute('aria-pressed', String((q.pgroup || 'region') === b.dataset.g)));
   }
@@ -331,10 +333,10 @@
     const opP = f.provs.filter((p) => p.op != null), plP = f.provs.filter((p) => p.pl != null);
     kset('providers', fInt(n)); kset('providers_sub', n === v.provs.length ? 'worldwide' : `of ${fInt(v.provs.length)} total`);
     kset('countries', fInt(byC.size)); kset('countries_sub', topC ? `Most: ${topC[0]} (${topC[1]})` : '');
-    kset('owns', n ? fPct(owns / n) : '—'); kset('owns_sub', `${fInt(owns)} providers`);
-    kset('price_lab', `${fam} median`); kset('price', med == null ? '—' : f$(med)); kset('price_sub', `lowest rate per GPU-hr · ${mins.length} providers`);
-    kset('op', opP.length ? fMW(d3.sum(opP, (p) => p.op)) : '—'); kset('op_sub', `disclosed by ${opP.length} providers`);
-    kset('pl', plP.length ? fMW(d3.sum(plP, (p) => p.pl)) : '—'); kset('pl_sub', `disclosed by ${plP.length} providers`);
+    kset('owns', n ? fPct(owns / n) : '—'); kset('owns_sub', plural(owns, 'provider'));
+    kset('price_lab', `${fam} median`); kset('price', med == null ? '—' : f$(med)); kset('price_sub', `lowest rate per GPU-hr · ${plural(mins.length, 'provider')}`);
+    kset('op', opP.length ? fMW(d3.sum(opP, (p) => p.op)) : '—'); kset('op_sub', `disclosed by ${plural(opP.length, 'provider')}`);
+    kset('pl', plP.length ? fMW(d3.sum(plP, (p) => p.pl)) : '—'); kset('pl_sub', `disclosed by ${plural(plP.length, 'provider')}`);
 
     const take = $('#takeaway'); take.classList.remove('dash-skeleton');
     if (!n) { take.textContent = 'No providers match these filters.'; return; }
@@ -1183,7 +1185,7 @@
       return dir === 'asc' ? d3.ascending(x, y) : d3.descending(x, y);
     });
     document.querySelectorAll('#dir th').forEach((th) => { const b = th.querySelector('button'); th.setAttribute('aria-sort', b && b.dataset.s === k ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'); });
-    $('#dir-count').textContent = `${fInt(rows.length)} providers · sorted by ${document.querySelector(`#dir th button[data-s="${k}"]`).textContent.toLowerCase()} (${dir === 'asc' ? 'low to high' : 'high to low'})`;
+    $('#dir-count').textContent = `${fInt(rows.length)} providers · sorted by ${document.querySelector(`#dir th button[data-s="${k}"]`).textContent.toLowerCase().replace(/\bmw\b/g, 'MW').replace(/\bh100\b/g, 'H100').replace(/\bgpus\b/g, 'GPUs').replace(/\bdc\b/g, 'DC')} (${dir === 'asc' ? 'low to high' : 'high to low'})`;
     const own = (o) => (OWN.find((x) => x[0] === o) || [0, o])[1];
     $('#dir tbody').replaceChildren(...rows.map((p) => {
       const tr = document.createElement('tr'); tr.dataset.key = p.provider; tr.tabIndex = 0; if (q.sel === p.provider) tr.className = 'on';
@@ -1227,38 +1229,69 @@
     }
     return d;
   }
+  let pfCitiesAll = false, pfFor = null;
   function drawDetail(v) {
     const el = $('#detail'); const name = P().sel; const p = name && v.byName.get(name);
     if (!p) { el.hidden = true; el.replaceChildren(); return; }
-    el.hidden = false;
-    const head = document.createElement('div'); head.className = 'gx-dhead';
-    const h = document.createElement('h3'); h.textContent = p.provider; withLogo(h, p.provider, 'lg');
-    const right = document.createElement('div'); right.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;align-items:center';
-    [p.hq, p.category, (OWN.find((o) => o[0] === p.ownership) || [0, p.ownership])[1]].forEach((t, i) => { const s = document.createElement('span'); s.className = 'pill'; s.textContent = i === 0 ? hqPlace(p, true) : t; if (i === 0) { withFlag(s, p.hq); s.title = 'Headquarters'; } right.append(s); });
-    if (/^https?:\/\//.test(String(p.website))) { const a = document.createElement('a'); a.href = p.website; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Website ↗'; a.className = 'gx-chip'; right.append(a); }
-    const x = document.createElement('button'); x.type = 'button'; x.className = 'gx-btn'; x.textContent = 'Close'; x.onclick = () => set({ sel: null }); right.append(x);
-    head.append(h, right);
-    const grid = document.createElement('div'); grid.className = 'gx-detail';
-    const fields = [['What they are', p.type], ['GPU models offered', p.models_text], ['Data center locations', p.locations], ['Operational capacity', p.op_mw_text],
-      ['Planned / contracted capacity', p.planned_mw_text], ['Capacity notes', p.capacity_notes], ['Investment / valuation', p.investment], ['Other information', p.notes]];
-    fields.forEach(([t, val]) => { if (!val || val === 'n.a.') return;
-      if (t === 'GPU models offered') { grid.append(topModels(v, p)); return; }
-      const d = document.createElement('div'); const h4 = document.createElement('h4'); h4.textContent = t; const pp = document.createElement('p'); pp.textContent = val; d.append(h4, pp); grid.append(d); });
-    if (p.cities.length) {
-      const d = document.createElement('div'); d.style.gridColumn = '1/-1';
-      const h4 = document.createElement('h4'); h4.textContent = `Data center cities (${p.cities.length})`;
-      const w = document.createElement('div'); w.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px';
-      p.cities.forEach((c) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'pill'; b.style.cursor = 'pointer'; b.textContent = c; b.title = 'Show providers with a data center in ' + c; b.onclick = () => { set({ city: c, sel: null, tab: 'overview', metric: 'cities' }); dash.setLink('overview'); }; w.append(b); });
-      d.append(h4, w); grid.prepend(d);
+    el.hidden = false; if (pfFor !== p.provider) { pfFor = p.provider; pfCitiesAll = false; }
+    const mk = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+    // header: logo, name, one meta line; actions on the right
+    const head = mk('div', 'gx-pf-head');
+    const id = mk('div', 'gx-pf-id'); id.append(logo(p.provider, 'lg'));
+    const tw = mk('div'); const h = mk('h3', null, p.provider);
+    const meta = mk('div', 'gx-pf-meta');
+    const hq = mk('span'); withFlag(hq, p.hq); hq.append(hqPlace(p, true)); hq.title = 'Headquarters';
+    const cat = mk('span'); cat.append(ICON('brief'), p.category || '—');
+    const own = (OWN.find((o) => o[0] === p.ownership) || [0, p.ownership || 'Not stated'])[1];
+    const ow = mk('span'); ow.append(ICON('server'), own === 'Not stated' ? 'Ownership not stated' : own);
+    meta.append(hq, cat, ow); tw.append(h, meta); id.append(tw);
+    const act = mk('div', 'gx-pf-act');
+    if (/^https?:\/\//.test(String(p.website))) { const a = document.createElement('a'); a.href = p.website; a.target = '_blank'; a.rel = 'noopener'; a.setAttribute('aria-label', 'Open website'); a.append(ICON('globe'), mk('span', null, 'Website')); act.append(a); }
+    const x = mk('button', 'gx-ibtn'); x.type = 'button'; x.setAttribute('aria-label', 'Close profile'); x.title = 'Close'; x.append(ICON('x')); x.onclick = () => set({ sel: null }); act.append(x);
+    head.append(id, act);
+    // key figures
+    const pr = v.prices.filter((r) => r.provider === p.provider).sort((a2, b2) => (a2.usd == null) - (b2.usd == null) || (a2.usd || 0) - (b2.usd || 0));
+    const fam = focus(); const fb = provMin(pr, fam)[0];
+    const stats = mk('div', 'gx-pf-stats');
+    [['Live capacity', p.op != null ? fMW(p.op) : '—'], ['Planned', p.pl != null ? fMW(p.pl) : '—'], ['GPU models', p.nm != null ? String(p.nm) : '—'],
+      [fam === ANY_GPU ? 'Lowest price' : `${fam} from`, fb ? `${f$(fb.usd)}/hr` : '—'], ['Data center cities', p.cities.length ? String(p.cities.length) : '—']]
+      .forEach(([l, val]) => { const d = mk('div'); d.append(mk('em', null, l), mk('strong', null, val)); stats.append(d); });
+    // data center cities, grouped by country, first 3 countries unless expanded
+    const parts = [head, stats];
+    const rows = v.cities.filter((r) => r.provider === p.provider);
+    if (rows.length) {
+      const sec = mk('div', 'gx-pf-sec'); sec.append(mk('h4', null, `Data center cities (${new Set(rows.map((r) => r.city)).size})`));
+      const box = mk('div', 'gx-pf-cities');
+      const byC = d3.groups(rows, (r) => r.country).sort((a2, b2) => b2[1].length - a2[1].length || d3.ascending(a2[0], b2[0]));
+      const LIM = 4; (pfCitiesAll ? byC : byC.slice(0, LIM)).forEach(([c, a2]) => {
+        const g = mk('div', 'grp'); const ct = mk('span', 'ctry'); withFlag(ct, c); ct.append(c); g.append(ct);
+        [...new Set(a2.map((r) => r.city))].forEach((cn) => { const bt = mk('button', P().city === cn ? 'on' : '', cn); bt.type = 'button'; bt.title = 'Show providers with a data center in ' + cn; bt.onclick = () => { set({ city: cn, sel: null, tab: 'overview', metric: 'cities' }); }; g.append(bt); });
+        box.append(g);
+      });
+      sec.append(box);
+      if (byC.length > LIM) { const m = mk('button', 'gx-linkbtn more', pfCitiesAll ? 'Show fewer countries' : `Show all ${byC.length} countries`); m.type = 'button'; m.onclick = () => { pfCitiesAll = !pfCitiesAll; drawDetail(cache.v); }; sec.append(m); }
+      parts.push(sec);
     }
-    const pr = v.prices.filter((r) => r.provider === p.provider);
-    const box = document.createElement('div'); box.className = 'gx-tablebox'; box.style.maxHeight = '320px';
-    const tb = document.createElement('table'); const th = document.createElement('thead'); th.innerHTML = '<tr><th style="padding:8px 10px">GPU</th><th style="padding:8px 10px">As published</th><th class="n" style="padding:8px 10px">Lowest $/GPU-hr</th></tr>';
-    const body = document.createElement('tbody');
-    pr.forEach((r) => { const tr = document.createElement('tr'); tr.style.cursor = 'default'; [[r.model, ''], [r.price_text, ''], [r.usd == null ? (r.excluded ? 'excluded' : '—') : f$(r.usd), 'n']].forEach(([t, c]) => { const td = document.createElement('td'); td.textContent = String(t); if (c) td.className = c; tr.append(td); }); body.append(tr); });
-    tb.append(th, body); box.append(tb);
-    const ph = document.createElement('h4'); ph.textContent = `Published prices (${pr.length})`; ph.style.cssText = 'margin:0;font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)';
-    el.replaceChildren(head, grid, ph, box);
+    // narrative fields
+    const grid = mk('div', 'gx-detail');
+    [['What they are', p.type], ['GPU models offered', p.models_text], ['Data center locations', p.locations], ['Operational capacity', p.op_mw_text],
+      ['Planned / contracted capacity', p.planned_mw_text], ['Capacity notes', p.capacity_notes], ['Investment / valuation', p.investment], ['Other information', p.notes]]
+      .forEach(([t, val]) => { if (!val || val === 'n.a.') return;
+        if (t === 'GPU models offered') { grid.append(topModels(v, p)); return; }
+        const d = mk('div'); d.append(mk('h4', null, t), mk('p', null, val)); grid.append(d); });
+    parts.push(grid);
+    // published prices
+    if (pr.length) {
+      const sec = mk('div', 'gx-pf-sec'); sec.append(mk('h4', null, `Published prices (${pr.length})`));
+      const box = mk('div', 'gx-tablebox'); box.style.maxHeight = '360px';
+      const tb = mk('table', 'gx-ptable'); const th = mk('thead'); th.innerHTML = '<tr><th><span>GPU</span></th><th><span>As published</span></th><th class="n"><span>Lowest $/GPU-hr</span></th></tr>';
+      const body = mk('tbody');
+      pr.forEach((r) => { const tr = mk('tr', r.usd == null ? 'np' : ''); tr.style.cursor = 'default';
+        const g = mk('td'); g.append(String(r.model || r.family)); if (r.basis && r.usd != null) g.append(mk('span', 'basis', r.basis));
+        tr.append(g, mk('td', 'pt', String(r.price_text || '')), mk('td', 'n', r.usd == null ? 'not stated' : f$(r.usd))); body.append(tr); });
+      tb.append(th, body); box.append(tb); sec.append(box); parts.push(sec);
+    }
+    el.replaceChildren(...parts);
   }
 
   /* ---------- insights ---------- */
