@@ -1521,3 +1521,6 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 /* rankings view: same gap between cards as every other page (20px desktop, 16px phones) */
 #sv-rank:not([hidden]){display:flex;flex-direction:column;gap:20px}
 @media (max-width:720px){#sv-rank:not([hidden]){gap:16px}}
+.gx-how ul{list-style:disc outside!important;padding-left:20px!important}
+.gx-how li{display:list-item!important;list-style:disc outside!important;padding-left:2px}
+.gx-how li::marker{color:var(--gx-gblue)}
