@@ -32,7 +32,8 @@
   const set = (o) => dash.setParams(o);
   const TABS = ['overview', 'pricing', 'capacity', 'hardware', 'directory'];
   const tabOf = () => (TABS.includes(P().tab) ? P().tab : 'overview');
-  function openProfile(name) { set({ sel: name, tab: 'directory' }); dash.setLink('directory'); requestAnimationFrame(() => { const d = $('#detail'); if (d && !d.hidden) d.scrollIntoView({ block: 'start', behavior: 'smooth' }); }); }
+  let pfReturn = null;
+  function openProfile(name) { if (!$('#drawer').classList.contains('open')) pfReturn = document.activeElement; set({ sel: name }); }
   document.querySelectorAll('.gx-tabs button').forEach((b) => b.addEventListener('click', () => { set({ tab: b.dataset.tab }); dash.setLink(b.dataset.tab); }));
 
   /* ---------- v3 interaction layer: sticky nav, mobile filter sheet, back-to-top ---------- */
@@ -323,7 +324,20 @@
     $('#f-done').textContent = `Show ${fInt(f.provs.length)} provider${f.provs.length === 1 ? '' : 's'}`;
   }
   /* ---------- KPIs + takeaway ---------- */
-  function kset(k, t) { const e = document.querySelector(`#kpis [data-k="${k}"]`); e.textContent = t; e.classList.remove('dash-skeleton'); }
+  const reduceMotion = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } })();
+  function kset(k, t) {
+    const e = document.querySelector(`#kpis [data-k="${k}"]`); e.classList.remove('dash-skeleton');
+    const m = /^([^\d]*)([\d,]*\.?\d+)(.*)$/.exec(t); const was = e.dataset.v;
+    e.dataset.v = t;
+    if (!e.classList.contains('val') || !m || was === t || reduceMotion) { if (was !== t) e.textContent = t; return; }
+    // count up from the previous figure (or zero on first paint) when the unit stays the same
+    const to = +m[2].replace(/,/g, ''); const dec = (m[2].split('.')[1] || '').length; const comma = m[2].includes(',') || to >= 1000;
+    const pm = was && /^([^\d]*)([\d,]*\.?\d+)(.*)$/.exec(was); const from = pm && pm[1] === m[1] && pm[3] === m[3] ? +pm[2].replace(/,/g, '') : 0;
+    const fmt = (x) => m[1] + (comma ? x.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }) : x.toFixed(dec)) + m[3];
+    const t0 = performance.now(), dur = was ? 420 : 900; const id = (e._cu = (e._cu || 0) + 1);
+    const step = (now) => { if (e._cu !== id) return; const u = Math.min(1, (now - t0) / dur); const ez = 1 - Math.pow(1 - u, 3); e.textContent = u >= 1 ? t : fmt(from + (to - from) * ez); if (u < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  }
   function drawKpis(v, f) {
     const fam = focus(); const n = f.provs.length;
     const byC = d3.rollup(f.provs.filter((p) => p.hq !== 'Unknown'), (a) => a.length, (p) => p.hq);
@@ -1232,8 +1246,9 @@
   let pfCitiesAll = false, pfFor = null;
   function drawDetail(v) {
     const el = $('#detail'); const name = P().sel; const p = name && v.byName.get(name);
-    if (!p) { el.hidden = true; el.replaceChildren(); return; }
-    el.hidden = false; if (pfFor !== p.provider) { pfFor = p.provider; pfCitiesAll = false; }
+    if (!p) { drawer(false); return; }
+    el.hidden = false; const fresh = pfFor !== p.provider; if (fresh) { pfFor = p.provider; pfCitiesAll = false; }
+    drawer(true, fresh);
     const mk = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
     // header: logo, name, one meta line; actions on the right
     const head = mk('div', 'gx-pf-head');
@@ -1472,6 +1487,73 @@
   fineHover.addEventListener && fineHover.addEventListener('change', () => DD.forEach(ddSync));
   const ddSyncAll = () => DD.forEach(ddSync);
   // phone filter row: drop the right-edge fade once scrolled to the end
+  let lastV = null;
+  function drawer(open, fresh) {
+    const d = $('#drawer'), sc = $('#d-scrim'), was = d.classList.contains('open');
+    if (open === was) { if (open && fresh) d.scrollTop = 0; return; }
+    d.classList.toggle('open', open); d.setAttribute('aria-hidden', String(!open));
+    if (open) { sc.hidden = false; requestAnimationFrame(() => sc.classList.add('on')); d.scrollTop = 0; setTimeout(() => { const x = $('#detail .gx-pf-head .gx-ibtn'); if (x && d.classList.contains('open')) x.focus({ preventScroll: true }); }, 60); }
+    else {
+      sc.classList.remove('on'); setTimeout(() => { if (!d.classList.contains('open')) { sc.hidden = true; $('#detail').hidden = true; $('#detail').replaceChildren(); pfFor = null; } }, 340);
+      const r = pfReturn; pfReturn = null; if (r && r.isConnected && r.focus) r.focus({ preventScroll: true });
+    }
+    lockScroll();
+  }
+  // ---- command palette: jump to any provider, GPU, country, city or section ----
+  let cItems = [], cIdx = 0, cPrev = null;
+  function cmdkOpen() { const c = $('#cmdk'); if (!c.hidden) return; cPrev = document.activeElement; c.hidden = false; $('#cmdk-q').value = ''; cIdx = 0; cmdkRender(); lockScroll(); requestAnimationFrame(() => $('#cmdk-q').focus()); }
+  function cmdkClose(refocus = true) { const c = $('#cmdk'); if (c.hidden) return; c.hidden = true; lockScroll(); if (refocus && cPrev && cPrev.isConnected && cPrev.focus) cPrev.focus({ preventScroll: true }); cPrev = null; }
+  function cmdkMark() {
+    $('#cmdk-list').querySelectorAll('.gx-cmdk-it').forEach((n, i) => { n.setAttribute('aria-selected', String(i === cIdx)); if (i === cIdx) { n.scrollIntoView({ block: 'nearest' }); $('#cmdk-q').setAttribute('aria-activedescendant', n.id); } });
+  }
+  function cmdkGo(it) { cmdkClose(it.kind !== 'provider'); if (it.kind === 'provider') pfReturn = cPrev || document.activeElement; it.go(); }
+  function cmdkRender() {
+    const v = lastV; const list = $('#cmdk-list'); list.replaceChildren(); cItems = [];
+    if (!v) { const e = document.createElement('div'); e.className = 'gx-cmdk-empty'; e.textContent = 'Loading data…'; list.append(e); return; }
+    const s = $('#cmdk-q').value.trim().toLowerCase();
+    const score = (name) => { const n = String(name).toLowerCase(); if (!s) return 1; if (n === s) return 4; if (n.startsWith(s)) return 3; if (n.split(/[\s(\-/]+/).some((w) => w.startsWith(s))) return 2; return n.includes(s) ? 1 : 0; };
+    const groups = [];
+    const SECT = [['overview', 'Geography', 'globe', 'Map of HQs and data center cities'], ['pricing', 'Pricing', 'tag', 'GPU-hour rates by model and provider'], ['capacity', 'Capacity', 'zap', 'Live and planned data center power'], ['hardware', 'GPU models', 'cpu', 'Who offers which accelerators'], ['directory', 'Directory', 'list', 'Every provider, sortable']];
+    const provs = v.provs.map((p) => ({ p, sc: Math.max(score(p.provider), s && String(p.hq_city || '').toLowerCase().startsWith(s) ? 1 : 0) })).filter((r) => r.sc > 0)
+      .sort((a, b) => b.sc - a.sc || (b.p.nm || 0) - (a.p.nm || 0) || d3.ascending(a.p.provider, b.p.provider)).slice(0, s ? 7 : 5)
+      .map(({ p }) => ({ kind: 'provider', label: p.provider, sub: [hqPlace(p, true), p.category, p.nm ? plural(p.nm, 'GPU model') : null].filter(Boolean).join(' · '), lead: () => logo(p.provider), hint: 'Open profile', go: () => openProfile(p.provider) }));
+    const fams = [...v.famInfo.values()].map((f) => ({ f, sc: score(f.family) })).filter((r) => r.sc > 0)
+      .sort((a, b) => b.sc - a.sc || (b.f.year - a.f.year) || d3.ascending(a.f.family, b.f.family)).slice(0, s ? 5 : 4)
+      .map(({ f }) => { const n = v.provs.filter((p) => p.fams.includes(f.family)).length; return { kind: 'gpu', label: f.family, sub: [f.vendor, f.year || null, plural(n, 'provider')].filter(Boolean).join(' · '), lead: () => ICON('gpu'), hint: famSel() === f.family ? 'Clear filter' : 'Filter', go: () => set({ family: famSel() === f.family ? null : f.family }) }; });
+    let places = [];
+    if (s) {
+      const ctry = new Map(); v.provs.forEach((p) => { if (p.hq && p.hq !== 'Unknown') ctry.set(p.hq, (ctry.get(p.hq) || 0) + 1); });
+      places = [...ctry].map(([c, n]) => ({ c, n, sc: score(c) })).filter((r) => r.sc > 0).sort((a, b) => b.sc - a.sc || b.n - a.n).slice(0, 4)
+        .map((r) => ({ kind: 'country', label: r.c, sub: `Country · ${plural(r.n, 'provider')} headquartered here`, lead: () => flag(r.c) || ICON('flag'), hint: 'Filter', go: () => set({ country: r.c, city: null, region: null }) }));
+      const cty = new Map(); v.cities.forEach((r) => { const k = r.city; const o = cty.get(k) || cty.set(k, { city: r.city, country: r.country, ps: new Set() }).get(k); o.ps.add(r.provider); });
+      places = places.concat([...cty.values()].map((r) => ({ ...r, sc: score(r.city) })).filter((r) => r.sc > 0).sort((a, b) => b.sc - a.sc || b.ps.size - a.ps.size).slice(0, 5)
+        .map((r) => ({ kind: 'city', label: r.city, sub: `Data center city · ${r.country} · ${plural(r.ps.size, 'provider')}`, lead: () => flag(r.country) || ICON('pin'), hint: 'Show on map', go: () => set({ city: r.city, tab: 'overview', metric: 'cities' }) })));
+    }
+    const sects = SECT.filter((x) => score(x[1]) > 0).map((x) => ({ kind: 'section', label: x[1], sub: x[3], lead: () => ICON(x[2]), hint: 'Go to', go: () => { set({ tab: x[0] }); window.scrollTo({ top: 0, behavior: 'smooth' }); } }));
+    if (s) { groups.push(['Providers', provs], ['GPU models', fams], ['Places', places], ['Sections', sects]); }
+    else { groups.push(['Go to', sects], ['Most GPU models', provs], ['Newest GPUs', fams]); }
+    let n = 0;
+    groups.forEach(([title, items]) => {
+      if (!items.length) return;
+      const g = document.createElement('div'); g.className = 'gx-cmdk-g'; g.textContent = title; g.setAttribute('role', 'presentation'); list.append(g);
+      items.forEach((it) => {
+        const i = n++; cItems.push(it);
+        const r = document.createElement('div'); r.className = 'gx-cmdk-it'; r.id = 'cmdk-o-' + i; r.setAttribute('role', 'option'); r.setAttribute('aria-selected', String(i === cIdx));
+        const ic = document.createElement('span'); ic.className = 'ic'; const ld = it.lead(); if (ld) ic.append(ld);
+        const t = document.createElement('span'); t.className = 't'; const b = document.createElement('b');
+        const L = String(it.label), at = s ? L.toLowerCase().indexOf(s) : -1;
+        if (at >= 0) { const mk = document.createElement('mark'); mk.textContent = L.slice(at, at + s.length); b.append(L.slice(0, at), mk, L.slice(at + s.length)); } else b.textContent = L;
+        const sm = document.createElement('small'); sm.textContent = it.sub || ''; t.append(b, sm);
+        const go = document.createElement('span'); go.className = 'go'; go.textContent = it.hint + ' ↵';
+        r.append(ic, t, go);
+        r.addEventListener('mousemove', () => { if (cIdx !== i) { cIdx = i; cmdkMark(); } });
+        r.addEventListener('click', () => cmdkGo(it));
+        list.append(r);
+      });
+    });
+    if (!cItems.length) { const e = document.createElement('div'); e.className = 'gx-cmdk-empty'; e.textContent = `No matches for “${$('#cmdk-q').value.trim()}”`; list.append(e); }
+    if (cIdx >= cItems.length) cIdx = 0; cmdkMark();
+  }
   const fEdge = () => { const f = $('#filters'); f.classList.toggle('at-end', f.scrollLeft + f.clientWidth >= f.scrollWidth - 4); };
   $('#filters').addEventListener('scroll', fEdge, { passive: true });
   const render = () => {
@@ -1495,11 +1577,48 @@
     if (tab === 'pricing') { drawDl(v, f); drawStrip(v, f); drawCheap(f); drawPGroup(f); insPricing(f); }
     if (tab === 'capacity') { drawMW(f); drawOwn(f); drawMWC(f); insCapacity(f); }
     if (tab === 'hardware') { drawAvail(v, f); drawGen(v, f); drawHeat(v, f); insHardware(v, f); }
-    if (tab === 'directory') { drawDir(f); drawDetail(v); }
+    if (tab === 'directory') { drawDir(f); }
+    lastV = v; drawDetail(v); if (!$('#cmdk').hidden) cmdkRender();
     ddSyncAll(); fEdge();
     if (!jumped) { jumped = true; const h = location.hash.slice(1); if (TABS.includes(h) && h !== tab) set({ tab: h }); }
   };
   dash.onData(render);
+  // ===== Atlas 2.0: navigation rail, profile drawer, command palette =====
+  const desk = matchMedia('(min-width:1100px)');
+  const tabsEl = document.querySelector('.gx-tabs'), tabsHome = tabsEl.parentNode, tabsNext = tabsEl.nextSibling;
+  const themeEl = $('#theme-toggle'), themeHome = themeEl.parentNode, themeNext = themeEl.nextSibling;
+  const placeRail = () => {
+    if (desk.matches) { if (tabsEl.parentNode.id !== 'rail-tabs') { $('#rail-tabs').append(tabsEl); tabsEl.setAttribute('aria-orientation', 'vertical'); $('#rail-foot').prepend(themeEl); } }
+    else if (tabsEl.parentNode !== tabsHome) { tabsHome.insertBefore(tabsEl, tabsNext); tabsEl.removeAttribute('aria-orientation'); themeHome.insertBefore(themeEl, themeNext); }
+  };
+  placeRail(); (desk.addEventListener ? desk.addEventListener('change', placeRail) : desk.addListener(placeRail));
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  document.querySelectorAll('[data-mod]').forEach((k) => { k.textContent = isMac ? '⌘K' : 'Ctrl K'; });
+  // shared scroll lock for the drawer, palette and filter sheet
+  function lockScroll() { const any = $('#drawer').classList.contains('open') || !$('#cmdk').hidden || (fBox.classList.contains('open') && phone.matches); document.documentElement.style.overflow = any ? 'hidden' : ''; }
+  $('#d-scrim').addEventListener('click', () => set({ sel: null }));
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'k') { e.preventDefault(); $('#cmdk').hidden ? cmdkOpen() : cmdkClose(); return; }
+    if (e.key === '/' && $('#cmdk').hidden && !/^(INPUT|TEXTAREA|SELECT)$/.test((e.target || {}).tagName || '') && !(e.target || {}).isContentEditable) { e.preventDefault(); cmdkOpen(); return; }
+    if (e.key === 'Escape' && $('#cmdk').hidden && $('#drawer').classList.contains('open') && !ddOpen) { e.preventDefault(); set({ sel: null }); }
+    if (e.key === 'Tab' && $('#drawer').classList.contains('open') && $('#cmdk').hidden) {
+      // keep keyboard focus inside the open profile
+      const fs = [...$('#detail').querySelectorAll('a[href],button:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter((x) => x.offsetParent !== null);
+      if (!fs.length) return; const a = fs[0], z = fs[fs.length - 1];
+      if (!$('#detail').contains(document.activeElement)) { e.preventDefault(); a.focus(); }
+      else if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); }
+      else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); }
+    }
+  });
+  ['#cmdk-btn', '#cmdk-top'].forEach((s) => { const b = $(s); if (b) b.addEventListener('click', () => cmdkOpen()); });
+  $('#cmdk').addEventListener('mousedown', (e) => { if (e.target.id === 'cmdk') cmdkClose(); });
+  $('#cmdk-x').addEventListener('click', () => cmdkClose());
+  $('#cmdk-q').addEventListener('input', () => { cIdx = 0; cmdkRender(); });
+  $('#cmdk-q').addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (!cItems.length) return; cIdx = (cIdx + (e.key === 'ArrowDown' ? 1 : -1) + cItems.length) % cItems.length; cmdkMark(); }
+    else if (e.key === 'Enter') { e.preventDefault(); const it = cItems[cIdx]; if (it) cmdkGo(it); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cmdkClose(); }
+  });
   // redraw charts when the width changes enough to switch layouts (rotation, window resize)
   let lastW = window.innerWidth, rT;
   window.addEventListener('resize', () => { clearTimeout(rT); rT = setTimeout(() => { if (Math.abs(window.innerWidth - lastW) > 40) { lastW = window.innerWidth; render(); } }, 200); });
