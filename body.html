@@ -83,7 +83,6 @@
   <!-- 01 Geography -->
   <section class="gx-panel" id="overview" role="tabpanel" aria-labelledby="tab-overview">
     <div class="gx-intro"><span class="gx-ib"><svg class="i" aria-hidden="true"><use href="#i-globe"/></svg></span><h2>Where providers come from, and where they run data centers</h2><p>Pick a provider to see its headquarters and every data center city it names on the map. Switch the list to <b>Countries</b> or <b>Cities</b> to filter by place.</p></div>
-    <div class="gx-ins" id="ins-overview" data-source="providers prices flags"></div>
     <div class="gx-explorer">
       <aside class="gx-card gx-side" id="explorer" aria-label="Explore providers, countries and cities">
         <div class="gx-sidehead">
@@ -103,7 +102,7 @@
       </aside>
       <div class="gx-card" id="map-card">
         <div class="gx-maphead">
-          <div class="gx-mapttl"><h3 id="map-title">Providers by HQ country</h3><p class="gx-note" id="map-note"></p></div>
+          <div class="gx-mapttl"><h3 id="map-title">Providers by HQ country</h3></div>
           <div class="gx-layers" id="metric" role="radiogroup" aria-label="Map layer" data-source="providers prices dc_cities">
             <div class="gx-lgrp"><span class="gx-lgl">Headquarters</span>
               <div class="gx-lrow">
@@ -123,6 +122,7 @@
         <div class="gx-focus" id="ex-focus" data-source="providers dc_cities logos flags" hidden></div>
         <div class="gx-chart" id="map" data-source="world_map countries providers prices dc_cities" style="min-height:280px"></div>
         <div class="gx-legend" id="map-legend"></div>
+        <p class="gx-note gx-mapnote" id="map-note"></p>
       </div>
     </div>
   </section>

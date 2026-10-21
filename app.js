@@ -1511,7 +1511,7 @@
     const none = !f.provs.length; $('#empty').hidden = !none;
     if (none) { const q = P(); const act = ['q', 'vendor', 'family', 'region', 'country', 'city', 'category', 'ownership', 'pm'].filter((k) => q[k] && q[k] !== '__all'); $('#empty-sub').textContent = act.length ? `${plural(act.length, 'filter')} applied. Remove one or reset to see all ${fInt(v.provs.length)} providers.` : 'No data to show right now.'; }
     TABS.forEach((id) => { document.getElementById(id).hidden = none || id !== tab; });
-    if (tab === 'overview') { drawMap(v, f); drawExplorer(v, f); drawFocus(v); insOverview(v, f); }
+    if (tab === 'overview') { drawMap(v, f); drawExplorer(v, f); drawFocus(v); }
     if (tab === 'pricing') { drawDl(v, f); drawStrip(v, f); drawCheap(f); drawPGroup(f); insPricing(f); }
     if (tab === 'capacity') { drawMW(f); drawOwn(f); drawMWC(f); insCapacity(f); }
     if (tab === 'hardware') { drawAvail(v, f); drawGen(v, f); drawHeat(v, f); insHardware(v, f); }
