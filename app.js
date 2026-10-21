@@ -1526,7 +1526,18 @@
   const SORTED = (rows) => rows.slice().sort((a, b) => (SEG_RANK[a.seg] ?? 9) - (SEG_RANK[b.seg] ?? 9) || (b.year - a.year) || d3.descending(a.bf16_tflops ?? -1, b.bf16_tflops ?? -1) || d3.ascending(a.model, b.model));
   const cmpList = (rows) => String(P().cmp || '').split('|').filter(Boolean).filter((m) => rows.some((r) => r.model === m)).slice(0, 4);
   const setCmp = (arr) => set({ cmp: arr.length ? arr.join('|') : null });
-  const jump = (el, off) => { if (!el) return; const y = el.getBoundingClientRect().top + window.scrollY - (off ?? 64); window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' }); };
+  const jump = (el, off) => { if (!el) return; el.style.scrollMarginTop = (off ?? 64) + 'px'; try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { const y = el.getBoundingClientRect().top + window.scrollY - (off ?? 64); window.scrollTo(0, Math.max(0, y)); } };
+  // Reset button is icon-only: keep its accessible name and tooltip in step with the (visually hidden) label
+  { const rb = $('#f-reset'), sp = rb && rb.querySelector('span'); if (sp) { const sync = () => { const t = sp.textContent.trim() || 'Reset'; rb.title = t === 'Reset' ? 'Reset filters' : t.replace('Reset', 'Reset filters'); rb.setAttribute('aria-label', rb.title); }; new MutationObserver(sync).observe(sp, { childList: true, characterData: true, subtree: true }); sync(); } }
+  // phones: back-to-top button + swipe left/right to move between GPUs in the detail view
+  { const gxEl = document.getElementById('gx'); if (gxEl && !document.getElementById('gx-top')) {
+      const up = document.createElement('button'); up.id = 'gx-top'; up.type = 'button'; up.setAttribute('aria-label', 'Back to top'); up.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
+      up.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' }); gxEl.append(up);
+      let tk = false; addEventListener('scroll', () => { if (tk) return; tk = true; requestAnimationFrame(() => { tk = false; up.classList.toggle('on', window.scrollY > 700); }); }, { passive: true });
+    }
+    const det = document.getElementById('gpu-detail'); let sx = 0, sy = 0, st = 0;
+    if (det) { det.addEventListener('touchstart', (e) => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; st = Date.now(); }, { passive: true });
+      det.addEventListener('touchend', (e) => { if (wideMQ.matches || e.target.closest('.gx-sn, table, .gx-scroll, input, select')) return; const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy; if (Math.abs(dx) < 80 || Math.abs(dy) > 45 || Math.abs(dx) < Math.abs(dy) * 2 || Date.now() - st > 600) return; const b = det.querySelector(`.gx-ibtn[aria-label="${dx < 0 ? 'Next GPU' : 'Previous GPU'}"]`); if (b && !b.disabled) b.click(); }, { passive: true }); } }
   let secObs = null;
   function watchSections() {
     if (secObs) secObs.disconnect();
@@ -1552,25 +1563,26 @@
     chipRow($('#sheet-seg'), 'Segment', segs, seg, 'gseg'); chipRow($('#sheet-ven'), 'Vendor', vends, ven, 'gvend');
     const list = SORTED(rows.filter((r) => (!seg || r.seg === seg) && (!ven || r.vendor === ven) && (!s || `${r.model} ${r.full_name} ${r.family} ${r.arch} ${r.vendor}`.toLowerCase().includes(s))));
     $('#sheet-count').textContent = `${plural(list.length, 'GPU')}${list.length !== rows.length ? ` of ${rows.length}` : ''} · per-GPU, dense figures from vendor datasheets`;
-    $('#sheet-empty').hidden = list.length > 0 || view === 'compare';
+    $('#sheet-empty').hidden = true;
     const cmp = cmpList(rows);
     const wide = wideMQ.matches;
-    const cur = rows.find((r) => r.model === q.gpu) || (wide && view === 'sheet' ? (list.find((r) => r.model === 'H100 SXM 80GB') || list[0] || rows[0]) : null);
+    const cur = rows.find((r) => r.model === q.gpu) || (wide && view === 'sheet' && list.length ? (list.find((r) => r.model === 'H100 SXM 80GB') || list[0]) : null);
     root2.dataset.m = cur && (q.gpu || wide) ? 'detail' : 'list';
-    if (view === 'sheet') { drawList(list, cur, cmp, rows); if (cur) drawDetail(v, S, cur, list, cmp); else $('#gpu-detail').replaceChildren(); }
+    if (view === 'sheet') { drawList(list, cur, cmp, rows); if (cur) drawGpuDetail(v, S, cur, list, cmp); else if (!list.length) { const e = mkEl('div', 'gx-none gx-nodet'); e.append(mkEl('b', null, '–'), mkEl('span', null, 'No GPU to show. Change the filters on the left to see its datasheet.')); $('#gpu-detail').replaceChildren(e); } else $('#gpu-detail').replaceChildren(); }
     if (view === 'compare') drawCompare(S, rows, cmp);
     if (view === 'rank') drawRank(S, list, q);
   }
 
   function drawList(list, cur, cmp, rows) {
     const ul = $('#sheet-ul'); ul.replaceChildren(); let lastSeg = null;
-    $('#sheet-list-h').replaceChildren(mkEl('b', null, plural(list.length, 'GPU')), ...(cmp.length ? [(() => { const b = mkEl('button', 'gx-btn gx-sm', `Compare ${cmp.length}`); b.type = 'button'; b.onclick = () => set({ gview: 'compare' }); return b; })()] : []));
+    $('#sheet-list-h').replaceChildren(mkEl('b', null, list.length ? plural(list.length, 'GPU') : '– GPUs'), ...(cmp.length ? [(() => { const b = mkEl('button', 'gx-btn gx-sm', `Compare ${cmp.length}`); b.type = 'button'; b.onclick = () => set({ gview: 'compare' }); return b; })()] : []));
+    if (!list.length) { const li = mkEl('li', 'gx-none'); const clr = mkEl('button', 'gx-btn gx-sm', 'Clear filters'); clr.type = 'button'; clr.onclick = () => set({ gseg: null, gvend: null, gq: null }); li.append(mkEl('b', null, '–'), mkEl('span', null, 'No GPU matches these filters.'), clr); ul.append(li); return; }
     list.forEach((r) => {
       if (r.seg !== lastSeg) { lastSeg = r.seg; const h = mkEl('li', 'gx-lg', r.seg); h.setAttribute('role', 'presentation'); ul.append(h); }
       const li = mkEl('li', 'gx-li' + (cur && cur.model === r.model ? ' on' : ''));
       const b = mkEl('button', 'gx-lr'); b.type = 'button'; if (cur && cur.model === r.model) b.setAttribute('aria-current', 'true');
       const dot = mkEl('i'); dot.style.background = vColor(r.vendor);
-      const t = mkEl('span', 'gx-lt'); t.append(mkEl('b', null, r.model), mkEl('small', null, [r.memory_gb != null ? `${fnum(r.memory_gb)} GB` : null, r.bf16_tflops != null ? `${fnum(r.bf16_tflops)} TFLOPS` : null, r.tdp_w ? `${fInt(r.tdp_w)} W` : null].filter(Boolean).join(' · ') || `${r.vendor} ${r.arch || ''}`));
+      const t = mkEl('span', 'gx-lt'); t.append(mkEl('b', null, r.model), mkEl('small', null, [r.memory_gb != null ? `${fnum(r.memory_gb)} GB` : '–', r.bf16_tflops != null ? `${fnum(r.bf16_tflops)} TFLOPS` : '–', r.tdp_w ? `${fInt(r.tdp_w)} W` : '–'].join(' · ')));
       b.append(dot, t); b.onclick = () => selectGpu(r.model);
       b.onkeydown = (e) => { if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return; e.preventDefault(); const bs = [...ul.querySelectorAll('.gx-lr')]; const n = bs[bs.indexOf(b) + (e.key === 'ArrowDown' ? 1 : -1)]; if (n) n.focus(); };
       const on = cmp.includes(r.model); const c = mkEl('button', 'gx-lc'); c.type = 'button'; c.setAttribute('aria-pressed', String(on)); c.setAttribute('aria-label', (on ? 'Remove from compare: ' : 'Add to compare: ') + r.model); c.title = on ? 'Remove from compare' : cmp.length >= 4 ? 'Compare is full (4 GPUs)' : 'Add to compare'; c.append(ICON(on ? 'check' : 'plus'));
@@ -1580,7 +1592,7 @@
     const on = ul.querySelector('.gx-li.on'); if (on && wideMQ.matches) { const t = on.offsetTop - ul.offsetTop - ul.clientHeight / 2 + on.offsetHeight / 2; ul.scrollTop = Math.max(0, t); }
   }
 
-  function drawDetail(v, S, r, list, cmp) {
+  function drawGpuDetail(v, S, r, list, cmp) {
     const el = $('#gpu-detail'); el.replaceChildren();
     const idx = list.findIndex((x) => x.model === r.model);
     // hero
@@ -1607,7 +1619,7 @@
     hero.append(act); el.append(hero);
     // section nav
     const sn = mkEl('nav', 'gx-sn'); sn.setAttribute('aria-label', 'Datasheet sections');
-    [['gs-key', 'Key figures'], ['gs-compute', 'Compute'], ['gs-mem', 'Memory and links'], ['gs-si', 'Silicon and power'], ['gs-bm', 'Benchmarks'], ['gs-src', 'Notes and sources']].forEach(([id, t]) => { const a = mkEl('button', null, t); a.type = 'button'; a.onclick = () => jump(document.getElementById(id), 118); sn.append(a); });
+    [['gs-key', 'Key figures'], ['gs-compute', 'Compute'], ['gs-mem', 'Memory and links'], ['gs-si', 'Silicon and power'], ['gs-bm', 'Benchmarks'], ['gs-src', 'Notes and sources']].forEach(([id, t]) => { const a = mkEl('button', null, t); a.type = 'button'; a.onclick = () => { sn.querySelectorAll('button').forEach((x) => x.removeAttribute('aria-current')); a.setAttribute('aria-current', 'true'); jump(document.getElementById(id), 118); }; sn.append(a); });
     el.append(sn);
     if (secObs) secObs.disconnect();
     // key figures
