@@ -45,7 +45,9 @@
   </div>
   </div>
 
-  <div class="gx-nav">
+  <div class="gx-quick" id="quick" role="group" aria-label="Quick views" hidden></div>
+
+<div class="gx-nav">
     <div class="gx-tabs" role="tablist" aria-label="Dashboard sections">
       <button type="button" role="tab" data-tab="overview" id="tab-overview"><svg class="i" aria-hidden="true"><use href="#i-globe"/></svg><span>Geography</span></button>
       <button type="button" role="tab" data-tab="pricing" id="tab-pricing"><svg class="i" aria-hidden="true"><use href="#i-tag"/></svg><span>Pricing</span></button>
@@ -69,6 +71,13 @@
       <button class="gx-btn gx-done" id="f-done" type="button">Show results</button></div>
     </div>
     <div class="gx-fchips" id="f-chips" hidden></div>
+  </div>
+
+  <div class="gx-empty" id="empty" role="status" hidden>
+    <span class="eic"><svg class="i" aria-hidden="true"><use href="#i-search"/></svg></span>
+    <h3>No providers match these filters</h3>
+    <p id="empty-sub">Try removing a filter or clearing the search to see the full list again.</p>
+    <div class="eac"><button type="button" id="empty-reset"><svg class="i" aria-hidden="true"><use href="#i-reset"/></svg>Reset filters</button></div>
   </div>
 
   <!-- 01 Geography -->

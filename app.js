@@ -324,6 +324,23 @@
   }
   /* ---------- KPIs + takeaway ---------- */
   function kset(k, t) { const e = document.querySelector(`#kpis [data-k="${k}"]`); e.textContent = t; e.classList.remove('dash-skeleton'); }
+  // one-click shortcuts: rent a flagship GPU, or see the cheapest rates overall
+  const QUICK = ['H100', 'H200', 'B200', 'GB200', 'GB300', 'MI300X'];
+  let quickKey = '';
+  function drawQuick(v) {
+    const el = $('#quick'); const tab = tabOf(); const F = famSel(); const on = tab === 'pricing' ? (F || (P().csort === 'usd' && !P().vendor ? '__cheap' : '')) : '';
+    const list = QUICK.filter((k) => v.famInfo.has(k)); const key = list.join() + '|' + on;
+    if (key === quickKey) return; quickKey = key;
+    el.hidden = !list.length; el.replaceChildren(); if (!list.length) return;
+    const lab = document.createElement('span'); lab.className = 'ql'; lab.textContent = 'Rent a GPU'; el.append(lab);
+    list.forEach((k) => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = k; b.setAttribute('aria-pressed', String(on === k)); b.title = `Compare ${k} prices, cheapest first`;
+      b.onclick = () => set(on === k ? { family: null } : { family: k, vendor: null, tab: 'pricing', csort: 'usd', cdir: 'asc' }); el.append(b);
+    });
+    const sep = document.createElement('span'); sep.className = 'qsep'; sep.setAttribute('aria-hidden', 'true'); el.append(sep);
+    const c = document.createElement('button'); c.type = 'button'; c.setAttribute('aria-pressed', String(on === '__cheap')); c.append(ICON('tag'), document.createTextNode('Cheapest overall')); c.title = 'Lowest rate per GPU-hour across all models';
+    c.onclick = () => set({ family: null, vendor: null, tab: 'pricing', csort: 'usd', cdir: 'asc' }); el.append(c);
+  }
   function drawKpis(v, f) {
     const fam = focus(); const n = f.provs.length;
     const byC = d3.rollup(f.provs.filter((p) => p.hq !== 'Unknown'), (a) => a.length, (p) => p.hq);
@@ -1488,9 +1505,12 @@
     root.style.setProperty('--gx-accent', 'var(--gx-gblue)'); root.style.setProperty('--gx-accent-2', C(3));
     const v = prep(); const f = filt(v);
     drawFilters(v); drawFSum(v, f); drawKpis(v, f);
+    drawQuick(v);
     const tab = tabOf(); root.dataset.tab = tab;
     document.querySelectorAll('.gx-tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
-    TABS.forEach((id) => { document.getElementById(id).hidden = id !== tab; });
+    const none = !f.provs.length; $('#empty').hidden = !none;
+    if (none) { const q = P(); const act = ['q', 'vendor', 'family', 'region', 'country', 'city', 'category', 'ownership', 'pm'].filter((k) => q[k] && q[k] !== '__all'); $('#empty-sub').textContent = act.length ? `${plural(act.length, 'filter')} applied. Remove one or reset to see all ${fInt(v.provs.length)} providers.` : 'No data to show right now.'; }
+    TABS.forEach((id) => { document.getElementById(id).hidden = none || id !== tab; });
     if (tab === 'overview') { drawMap(v, f); drawExplorer(v, f); drawFocus(v); insOverview(v, f); }
     if (tab === 'pricing') { drawDl(v, f); drawStrip(v, f); drawCheap(f); drawPGroup(f); insPricing(f); }
     if (tab === 'capacity') { drawMW(f); drawOwn(f); drawMWC(f); insCapacity(f); }
@@ -1499,6 +1519,7 @@
     ddSyncAll(); fEdge();
     if (!jumped) { jumped = true; const h = location.hash.slice(1); if (TABS.includes(h) && h !== tab) set({ tab: h }); }
   };
+  $('#empty-reset').addEventListener('click', () => $('#f-reset').click());
   dash.onData(render);
   // redraw charts when the width changes enough to switch layouts (rotation, window resize)
   let lastW = window.innerWidth, rT;
