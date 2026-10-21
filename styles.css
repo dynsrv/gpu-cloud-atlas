@@ -1534,3 +1534,6 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 #sheet-legend{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px}
 #sheet-legend span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 #sheet-legend i{flex:none;margin:0!important}
+
+/* filter row: wrap to a second line instead of squeezing labels ("Any owners...", "Search pr") */
+@media (min-width:721px){#filters.gx-filters{flex-wrap:wrap!important}#filters.gx-filters .gx-f{flex:1 1 9.5rem!important;min-width:9.5rem!important}#filters.gx-filters .gx-f:has(#f-family){flex:1.4 1 13rem!important}#filters.gx-filters .gx-search{flex:1.2 1 12rem!important;min-width:11rem!important}}
