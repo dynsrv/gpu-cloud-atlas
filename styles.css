@@ -1313,3 +1313,51 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .gx-shq .i{flex:none;width:16px;height:16px;color:var(--color-fg-muted)}
 .gx-cmpn{display:flex!important;flex-direction:column!important;align-items:flex-start}
 .gx-cmpn b,.gx-cmpn small{display:block}
+/* ---- density pass: tighter spacing ---- */
+#datasheet{gap:10px}
+#sheet-body{gap:12px}
+.gx-ms{gap:12px}
+.gx-md{gap:10px}
+.gx-shfilters{flex-direction:row;flex-wrap:wrap;gap:6px 24px}
+.gx-shrow{gap:4px}
+.gx-shrow .cl{min-width:0;margin-right:2px}
+.gx-shrow button{min-height:28px;padding:0 10px;font-size:12.5px}
+.gx-views button{min-height:32px;padding:0 14px}
+.gx-shq{min-height:36px}
+.gx-ml-h{padding:7px 12px}
+.gx-lg{padding:8px 12px 4px;font-size:10.5px}
+.gx-lr{padding:5px 6px 5px 8px;gap:8px}
+.gx-lc{width:28px;height:28px}
+.gx-gh,.gx-gs{padding:14px 18px}
+.gx-gh{gap:8px}
+.gx-gh-top{min-height:28px}
+.gx-gh-name{font-size:26px}
+.gx-gh-full{margin-top:-4px}
+.gx-gh-sum{font-size:14.5px;line-height:1.5}
+.gx-pill{min-height:24px;padding:0 8px;font-size:12px}
+.gx-gh-act .gx-btn{min-height:34px;padding:0 12px;font-size:13px}
+.gx-sn{padding:4px}.gx-sn button{min-height:28px;padding:0 10px;font-size:12.5px}
+.gx-gs{gap:8px}
+.gx-gs h3{font-size:16px}
+.gx-tiles{gap:8px}
+.gx-tile{padding:10px 12px;gap:4px}
+.gx-tile b{font-size:22px}
+.gx-tile b small{font-size:12px}
+.gx-tile .l,.gx-tile .s{font-size:11.5px}
+.gx-tile .bar,.gx-pr .bar{height:5px}
+.gx-pr{padding:6px 0;gap:12px}
+.gx-pr .pl small{font-size:11.5px}
+.gx-derived{gap:8px}.gx-derived>div{padding:9px 12px}.gx-derived b{font-size:16px}
+.gx-sp dt,.gx-sp dd{padding:6px 0;font-size:13px}
+.gx-bm{padding:10px 12px;gap:14px}.gx-bm .big b{font-size:22px}
+.gx-det summary{padding:9px 0}
+.gx-cmpt td,.gx-cmpt tbody th{padding:6px 12px}
+.gx-cmpt td .cv{margin-bottom:3px}
+.gx-shr{padding:3px 8px}
+#sheet-cmp{gap:10px}
+@media (max-width:720px){
+  .gx-gh,.gx-gs{padding:12px}
+  .gx-gh-name{font-size:22px}
+  .gx-tile b{font-size:20px}
+  .gx-shfilters{flex-direction:column;gap:6px}
+}
