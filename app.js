@@ -18,7 +18,8 @@
   ];
   const ownColor = (o) => { const e = OWN.find((x) => x[0] === o); return !e || e[2] < 0 ? MUTED : C(e[2]); };
   const VENDORS = ['NVIDIA', 'AMD', 'Intel', 'Google', 'AWS', 'Huawei'];
-  const vColor = (v) => C(Math.max(0, VENDORS.indexOf(v)));
+  const VBRAND = { NVIDIA: '#76B900', AMD: '#404040', Intel: '#8E44AD', Google: '#4285F4', AWS: '#FF9900', Huawei: '#CF0A2C' };
+  const vColor = (v) => { const g = document.getElementById('gx'); const dark = g && g.getAttribute('data-gx-theme') === 'dark'; if (v === 'AMD' && dark) return '#A8A8A8'; return VBRAND[v] || C(Math.max(0, VENDORS.indexOf(v))); };
   const resolveColor = (c) => { const el = document.createElement('span'); el.style.color = c; root.appendChild(el); const v = getComputedStyle(el).color; el.remove(); return v; };
   const P = () => dash.params() || {};
   const hostDark = () => { const a = document.documentElement.getAttribute('data-theme'); if (a === 'dark' || a === 'light') return a === 'dark'; try { return matchMedia('(prefers-color-scheme: dark)').matches; } catch (e) { return false; } };
