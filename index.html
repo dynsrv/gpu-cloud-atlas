@@ -290,6 +290,12 @@
           <div class="gx-seg" id="sheet-metric" role="group" aria-label="Metric"></div>
           <div class="gx-shchart" id="sheet-chart"></div>
         </div>
+        <div class="gx-card" id="tok-card">
+          <div class="gx-ch"><div><h3>Tokens per second <span class="gx-est">Synthetic estimate</span></h3><p class="gx-note" id="tok-sub"></p></div><div class="gx-legend" id="tok-legend"></div></div>
+          <div class="gx-tokctl"><div class="gx-seg" id="tok-model" role="group" aria-label="Open-source model"></div><div class="gx-seg" id="tok-load" role="group" aria-label="Concurrent users"></div><div class="gx-seg" id="tok-gpus" role="group" aria-label="GPUs per setup"></div></div>
+          <div class="gx-shchart" id="tok-chart"></div>
+          <details class="gx-how"><summary>How this is estimated</summary><div id="tok-how"></div></details>
+        </div>
         <div class="gx-card" style="padding:0;gap:0">
           <p class="gx-note" style="padding:var(--s3) var(--s4)">Select a row for the full datasheet. Tick the box to add it to compare.</p>
           <div class="gx-tablebox gx-shtb"><table id="sheet"><thead><tr><th class="cmp"><span class="sr">Compare</span></th><th class=""><button type="button" data-s="model">GPU</button></th><th class="hide-narrow"><button type="button" data-s="arch">Architecture</button></th><th class="n "><button type="button" data-s="memory_gb">Memory</button></th><th class="n hide-narrow"><button type="button" data-s="mem_bw_tbs">Bandwidth</button></th><th class="n "><button type="button" data-s="bf16_tflops">BF16</button></th><th class="n hide-narrow"><button type="button" data-s="fp8_tflops">FP8</button></th><th class="n hide-narrow"><button type="button" data-s="fp4_tflops">FP4</button></th><th class="n "><button type="button" data-s="tdp_w">Power</button></th></tr></thead><tbody></tbody></table></div>

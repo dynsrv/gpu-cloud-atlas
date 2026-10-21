@@ -1701,6 +1701,74 @@
     tbl.append(tbd); tb.append(tbl); el.append(tb);
   }
 
+
+  // ---- synthetic tokens/s: roofline estimate of LLM decode speed per GPU ----
+  const TOK_CTX = 2048;
+  const LLMS = [
+    { id: 'l8', name: 'Llama 3.1 8B', short: '8B dense', params: 8.03, active: 8.03, kv: 131072, moe: null,
+      cand: [['BF16', 2.0, 'bf16']] },
+    { id: 'l70', name: 'Llama 3.3 70B', short: '70B dense', params: 70.6, active: 70.6, kv: 327680, moe: null,
+      cand: [['8-bit', 1.0, 'fp8|bf16']] },
+    { id: 'oss', name: 'gpt-oss-120b', short: '117B MoE, 5.1B active', params: 116.8, active: 5.1, kv: 40960,
+      moe: { fixedGB: 2.5, expertGB: 62.5, experts: 128, topk: 4 }, cand: [['MXFP4', null, 'fp8|bf16', 65]] },
+  ];
+  const TOK_LOADS = [[1, '1 user'], [32, '32 users']];
+  function tokEstimate(r, m, B) {
+    const bw = r.mem_bw_tbs, mem = r.memory_gb; if (!bw || !mem) return null;
+    let best = null;
+    m.cand.forEach(([prec, bpp, cmpK, fixedW], ci) => {
+      const tf = cmpK.split('|').map((k) => (k === 'fp8' ? r.fp8_tflops : r.bf16_tflops)).find((x) => x != null);
+      if (tf == null) return;
+      const W = fixedW || m.params * bpp; // GB of weights held in memory
+      const kvGB = (B * TOK_CTX * m.kv) / 1e9;
+      const N = [1, 2, 4, 8].find((n) => W + kvGB <= 0.9 * mem * n); if (!N) return;
+      if (best && (N > best.N || (N === best.N))) return; // fewest GPUs wins; ties keep the higher-quality precision listed first
+      const tp = Math.pow(0.9, Math.log2(N));
+      const readGB = m.moe ? m.moe.fixedGB + m.moe.expertGB * (1 - Math.pow(1 - m.moe.topk / m.moe.experts, B)) : W;
+      const effM = m.moe ? 0.4 : 0.7;
+      const tMem = (readGB + kvGB) / (N * bw * 1000 * effM * tp); // seconds per decode step (bw in TB/s -> GB/s)
+      const tCmp = (B * 2 * m.active * 1e9) / (N * tf * 1e12 * 0.5 * tp);
+      const step = Math.max(tMem, tCmp);
+      best = { prec, N, ci, agg: B / step, user: 1 / step, bound: tMem >= tCmp ? 'memory-bandwidth bound' : 'compute bound' };
+    });
+    return best;
+  }
+  function drawTok(list, q) {
+    const m = LLMS.find((x) => x.id === q.tkm) || LLMS[1]; const B = Number(q.tkb) === 32 ? 32 : 1;
+    const mb = $('#tok-model'); mb.replaceChildren(); LLMS.forEach((x) => { const b = mkEl('button', null, x.name); b.type = 'button'; b.title = x.short; b.setAttribute('aria-pressed', String(x === m)); b.onclick = () => set({ tkm: x.id }); mb.append(b); });
+    const lb = $('#tok-load'); lb.replaceChildren(); TOK_LOADS.forEach(([n, t]) => { const b = mkEl('button', null, t); b.type = 'button'; b.setAttribute('aria-pressed', String(n === B)); b.onclick = () => set({ tkb: n === 1 ? null : String(n) }); lb.append(b); });
+    const anyN = q.tkg === 'any';
+    const gb = $('#tok-gpus'); gb.replaceChildren(); [[false, 'On 1 GPU'], [true, 'Any number of GPUs']].forEach(([v, t]) => { const b = mkEl('button', null, t); b.type = 'button'; b.setAttribute('aria-pressed', String(v === anyN)); b.onclick = () => set({ tkg: v ? 'any' : null }); gb.append(b); });
+    const all = list.map((r) => ({ r, e: tokEstimate(r, m, B) })).filter((d) => d.e).map((d) => ({ ...d, x: B === 1 ? d.e.user : d.e.agg }));
+    const cd = all.filter((d) => anyN || d.e.N === 1).sort((a, b) => b.x - a.x); const hiddenMulti = all.length - cd.length;
+    const mx = d3.max(cd, (d) => d.x) || 1; const ch = $('#tok-chart'); ch.replaceChildren();
+    const fT = (x) => (x >= 100 ? fInt(Math.round(x / 10) * 10) : x >= 10 ? fInt(Math.round(x)) : x.toFixed(1));
+    $('#tok-sub').textContent = `${m.name} (${m.short}) · ${B === 1 ? 'speed one user sees, tokens generated per second' : 'total tokens per second while serving 32 users at once'} · ${TOK_CTX.toLocaleString()}-token context · ${plural(cd.length, 'GPU')}${anyN ? ' · multi-GPU rows show the whole setup' : ''}`;
+    cd.forEach((d, i) => {
+      const row = mkEl('button', 'gx-shr gx-tokr'); row.type = 'button';
+      row.title = `${d.r.model}: ${d.e.prec} on ${plural(d.e.N, 'GPU')}, ${d.e.bound}. Open the datasheet.`;
+      const nm = mkEl('span', 'nm'); const dot = mkEl('i'); dot.style.background = vColor(d.r.vendor);
+      const lab = mkEl('span', 'tk'); lab.append(document.createTextNode(d.r.model), mkEl('small', null, `${d.e.prec} · ${d.e.N === 1 ? '1 GPU' : d.e.N + ' GPUs'}`));
+      nm.append(mkEl('em', null, String(i + 1)), dot, lab);
+      const bar = mkEl('span', 'bar'); const f = mkEl('span'); f.style.width = Math.max(1.5, (d.x / mx) * 100) + '%'; f.style.background = vColor(d.r.vendor); bar.append(f);
+      const val = mkEl('span', 'val'); const v1 = mkEl('span'); v1.append(mkEl('b', null, fT(d.x)), mkEl('small', null, ' tok/s')); val.append(v1); if (B !== 1) val.append(mkEl('small', null, `${fT(d.e.user)} per user`));
+      row.append(nm, bar, val); row.onclick = () => selectGpu(d.r.model); ch.append(row);
+    });
+    if (!cd.length) ch.append(mkEl('p', 'gx-note', hiddenMulti ? 'No GPU in this view can hold this model on its own.' : 'No GPU in this view has the memory, bandwidth and compute figures needed for an estimate.'));
+    if (hiddenMulti) { const more = mkEl('button', 'gx-linkbtn gx-tokmore', `${plural(hiddenMulti, 'more GPU')} need 2 to 8 GPUs for this model. Show them`); more.type = 'button'; more.onclick = () => set({ tkg: 'any' }); ch.append(more); }
+    const lg = $('#tok-legend'); lg.replaceChildren(); VENDORS.filter((x) => cd.some((d) => d.r.vendor === x)).forEach((x) => { const s2 = mkEl('span'); const i = mkEl('i'); i.style.background = vColor(x); s2.append(i, document.createTextNode(x)); lg.append(s2); });
+    const how = $('#tok-how'); if (!how.childElementCount) {
+      const ul = mkEl('ul');
+      [
+        'These are not measured results. They come from a simple roofline model using each GPU\'s published memory, bandwidth and dense tensor throughput, so they compare chips on equal terms. Real speeds depend on the serving software (vLLM, TensorRT-LLM, SGLang), drivers, interconnect and settings, and are often 20 to 40% different.',
+        'Each token needs the model weights (and the conversation\'s KV cache) read from memory, and about 2 operations per active parameter. Speed is the slower of the two: memory bytes ÷ bandwidth, or operations ÷ compute. We assume 70% of peak bandwidth for dense models, 40% for the mixture-of-experts model, and 50% of peak compute.',
+        `Context is ${TOK_CTX.toLocaleString()} tokens per user with a 16-bit KV cache. "32 users" adds 32 KV caches and batches 32 requests per step, which uses compute far better.`,
+        'Every GPU runs the same weights, so the ranking compares hardware, not quantization: Llama 3.1 8B in BF16 (16 GB), Llama 3.3 70B in 8-bit (71 GB; FP8 where the chip supports it, otherwise 8-bit weights with 16-bit math) and gpt-oss-120b in its native MXFP4 (about 65 GB). We keep 10% of memory free. When the model and KV cache do not fit on one GPU, tensor parallel across 2, 4 or 8 GPUs is assumed, losing 10% per doubling, and the row shows how many GPUs that takes.',
+        'For measured numbers, see the published MLPerf results in each GPU\'s Benchmarks section.',
+      ].forEach((t) => ul.append(mkEl('li', null, t)));
+      how.append(ul);
+    }
+  }
   function drawRank(S, list, q) {
     const mk = GMET.find((m) => m[0] === q.gmetric) || GMET[2]; const k = mk[0];
     const mb = $('#sheet-metric'); mb.replaceChildren(); GMET.forEach((m) => { const b = mkEl('button', null, m[1]); b.type = 'button'; b.setAttribute('aria-pressed', String(m[0] === k)); b.onclick = () => set({ gmetric: m[0] }); mb.append(b); });
@@ -1709,6 +1777,7 @@
     $('#sheet-chart-sub').textContent = `${mk[1]} (${UNIT[k]}) · ${asc ? 'lowest first' : 'highest first'} · ${plural(cd.length, 'GPU')} with a published figure${cd.length < list.length ? `, ${list.length - cd.length} without` : ''}`;
     cd.forEach((d, i) => { const row = mkEl('button', 'gx-shr'); row.type = 'button'; row.title = `Open ${d.r.model}`; const nm = mkEl('span', 'nm'); const dot = mkEl('i'); dot.style.background = vColor(d.r.vendor); nm.append(mkEl('em', null, String(i + 1)), dot, document.createTextNode(d.r.model)); const bar = mkEl('span', 'bar'); const f = mkEl('span'); f.style.width = Math.max(1.5, (d.x / mx) * 100) + '%'; f.style.background = vColor(d.r.vendor); bar.append(f); row.append(nm, bar, mkEl('span', 'val', fnum(d.x))); row.onclick = () => selectGpu(d.r.model); ch.append(row); });
     if (!cd.length) ch.append(mkEl('p', 'gx-note', 'No GPU in this view has a published figure for this metric.'));
+    drawTok(list, q);
     const lg = $('#sheet-legend'); lg.replaceChildren(); VENDORS.filter((x) => cd.some((d) => d.r.vendor === x)).forEach((x) => { const s2 = mkEl('span'); const i = mkEl('i'); i.style.background = vColor(x); s2.append(i, document.createTextNode(x)); lg.append(s2); });
     const sk = SCOLS.some((c) => c[0] === q.gsort) ? q.gsort : null, dir = q.gdir === 'asc' ? 'asc' : 'desc';
     let tl = list.slice(); if (sk) tl.sort((a, b) => { const tx = sk === 'model' || sk === 'arch'; const x = tx ? String(a[sk] || '').toLowerCase() : a[sk], y = tx ? String(b[sk] || '').toLowerCase() : b[sk]; if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1; return dir === 'asc' ? d3.ascending(x, y) : d3.descending(x, y); });
