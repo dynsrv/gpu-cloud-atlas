@@ -41,6 +41,11 @@
 <div class="gx" id="gx">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
 <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6 3h8l5 5v13H6zM14 3v5h5M9 13h7M9 17h7"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+<symbol id="i-prev" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+<symbol id="i-next" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+<symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5"/></symbol>
 <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></symbol>
 <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.4"/></symbol>
 <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></symbol>
@@ -263,32 +268,34 @@
   </section>
 
   <!-- 06 GPU Datasheet -->
-  <section class="gx-panel" id="datasheet" role="tabpanel" aria-labelledby="tab-datasheet" hidden>
-    <div class="gx-intro"><span class="gx-ib"><svg class="i" aria-hidden="true"><use href="#i-doc"/></svg></span><h2>GPU datasheet</h2><p>One consistent spec sheet for every GPU in the tracker: memory, compute by precision, power, interconnect and published benchmarks. All figures are per GPU and dense (no sparsity), taken from vendor datasheets. A dash means the vendor does not publish it.</p></div>
-    <div class="gx-card gx-shctl" data-source="gpu_specs">
-      <div class="gx-shrow" id="sheet-seg" role="group" aria-label="Segment"></div>
-      <div class="gx-shrow" id="sheet-ven" role="group" aria-label="Vendor"></div>
+  <section class="gx-panel" id="datasheet" role="tabpanel" aria-labelledby="tab-datasheet" data-m="detail" hidden>
+    <div class="gx-intro"><span class="gx-ib"><svg class="i" aria-hidden="true"><use href="#i-doc"/></svg></span><h2>GPU datasheet</h2><p>Pick any GPU for its full spec sheet, or compare up to four side by side. Every figure is per GPU and dense (no sparsity), from vendor datasheets, so models line up like for like.</p></div>
+    <div class="gx-dsbar" data-source="gpu_specs">
+      <div class="gx-seg gx-views" id="ds-views" role="tablist" aria-label="Datasheet view">
+        <button type="button" role="tab" data-v="sheet">Spec sheet</button><button type="button" role="tab" data-v="compare">Compare</button><button type="button" role="tab" data-v="rank">Rankings</button>
+      </div>
       <label class="gx-search gx-shq"><svg class="i" aria-hidden="true"><use href="#i-search"/></svg><input id="sheet-q" type="search" placeholder="Search a GPU, e.g. H100" autocomplete="off" aria-label="Search GPUs"></label>
-      <p class="gx-note" id="sheet-count" aria-live="polite"></p>
     </div>
+    <div class="gx-shfilters"><div class="gx-shrow" id="sheet-seg" role="group" aria-label="Segment"></div><div class="gx-shrow" id="sheet-ven" role="group" aria-label="Vendor"></div></div>
+    <p class="gx-note gx-shcount" id="sheet-count" aria-live="polite"></p>
     <div id="sheet-body" data-source="gpu_specs providers prices gpu_families">
-      <div class="gx-card gx-dpanel" id="gpu-detail" hidden></div>
-      <div class="gx-card" id="sheet-cmp" hidden></div>
-      <div class="gx-card">
-        <div class="gx-ch"><div><h3>Compare on one metric</h3><p class="gx-note" id="sheet-chart-sub"></p></div><div class="gx-legend" id="sheet-legend"></div></div>
-        <div class="gx-seg" id="sheet-metric" role="group" aria-label="Metric"></div>
-        <div class="gx-shchart" id="sheet-chart"></div>
+      <div class="gx-ms" id="sv-sheet">
+        <aside class="gx-ml" aria-label="GPU list"><div class="gx-ml-h" id="sheet-list-h"></div><ul id="sheet-ul"></ul></aside>
+        <article class="gx-md" id="gpu-detail" aria-live="polite"></article>
       </div>
-      <div class="gx-card" style="padding:0;gap:0">
-        <p class="gx-note" style="padding:var(--s3) var(--s4)">Select a row for the full datasheet. Tick the check mark to compare up to four GPUs side by side.</p>
-        <div class="gx-tablebox gx-shtb">
-          <table id="sheet">
-            <thead><tr><th class="cmp"><span class="sr">Compare</span></th><th class="" data-field="model"><button type="button" data-s="model">GPU</button></th><th class="hide-narrow" data-field="arch"><button type="button" data-s="arch">Architecture</button></th><th class="n " data-field="memory_gb"><button type="button" data-s="memory_gb">Memory</button></th><th class="n hide-narrow" data-field="mem_bw_tbs"><button type="button" data-s="mem_bw_tbs">Bandwidth</button></th><th class="n " data-field="bf16_tflops"><button type="button" data-s="bf16_tflops">BF16</button></th><th class="n hide-narrow" data-field="fp8_tflops"><button type="button" data-s="fp8_tflops">FP8</button></th><th class="n hide-narrow" data-field="fp4_tflops"><button type="button" data-s="fp4_tflops">FP4</button></th><th class="n " data-field="tdp_w"><button type="button" data-s="tdp_w">Power</button></th></tr></thead>
-            <tbody></tbody>
-          </table>
+      <div id="sv-compare" hidden><div class="gx-card" id="sheet-cmp"></div></div>
+      <div id="sv-rank" hidden>
+        <div class="gx-card">
+          <div class="gx-ch"><div><h3>Rank GPUs by one metric</h3><p class="gx-note" id="sheet-chart-sub"></p></div><div class="gx-legend" id="sheet-legend"></div></div>
+          <div class="gx-seg" id="sheet-metric" role="group" aria-label="Metric"></div>
+          <div class="gx-shchart" id="sheet-chart"></div>
         </div>
-        <p class="gx-note" id="sheet-empty" hidden style="padding:var(--s4)">No GPU matches. Clear the search or pick another segment.</p>
+        <div class="gx-card" style="padding:0;gap:0">
+          <p class="gx-note" style="padding:var(--s3) var(--s4)">Select a row for the full datasheet. Tick the box to add it to compare.</p>
+          <div class="gx-tablebox gx-shtb"><table id="sheet"><thead><tr><th class="cmp"><span class="sr">Compare</span></th><th class=""><button type="button" data-s="model">GPU</button></th><th class="hide-narrow"><button type="button" data-s="arch">Architecture</button></th><th class="n "><button type="button" data-s="memory_gb">Memory</button></th><th class="n hide-narrow"><button type="button" data-s="mem_bw_tbs">Bandwidth</button></th><th class="n "><button type="button" data-s="bf16_tflops">BF16</button></th><th class="n hide-narrow"><button type="button" data-s="fp8_tflops">FP8</button></th><th class="n hide-narrow"><button type="button" data-s="fp4_tflops">FP4</button></th><th class="n "><button type="button" data-s="tdp_w">Power</button></th></tr></thead><tbody></tbody></table></div>
+        </div>
       </div>
+      <p class="gx-note gx-empty-s" id="sheet-empty" hidden>No GPU matches. Clear the search or pick another segment or vendor.</p>
     </div>
   </section>
 

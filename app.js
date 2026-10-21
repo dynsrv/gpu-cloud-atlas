@@ -1491,182 +1491,216 @@
   // phone filter row: drop the right-edge fade once scrolled to the end
   const fEdge = () => { const f = $('#filters'); f.classList.toggle('at-end', f.scrollLeft + f.clientWidth >= f.scrollWidth - 4); };
   $('#filters').addEventListener('scroll', fEdge, { passive: true });
-  // ===== GPU Datasheet: one consistent spec sheet per GPU =====
+  // ===== GPU Datasheet v2: master-detail spec sheet, compare, rankings =====
   const fnum = (x) => (x == null ? '—' : x >= 100 ? fInt(Math.round(x)) : x >= 10 ? String(+x.toFixed(1)) : String(+x.toFixed(2)));
-  const SHEET_FIELDS = [
-    ['Memory & bandwidth', [
-      ['memory_gb', 'Memory', (r) => (r.memory_gb == null ? null : `${fnum(r.memory_gb)} GB${r.memory_type ? ' ' + r.memory_type : ''}`), 1],
-      ['mem_bw_tbs', 'Bandwidth', (r) => (r.mem_bw_tbs == null ? null : `${fnum(r.mem_bw_tbs)} TB/s`), 1]]],
-    ['Compute per GPU (dense, no sparsity)', [
-      ['fp64_tflops', 'FP64', (r) => (r.fp64_tflops == null ? null : `${fnum(r.fp64_tflops)} TFLOPS`), 1],
-      ['fp32_tflops', 'FP32', (r) => (r.fp32_tflops == null ? null : `${fnum(r.fp32_tflops)} TFLOPS`), 1],
-      ['tf32_tflops', 'TF32 tensor', (r) => (r.tf32_tflops == null ? null : `${fnum(r.tf32_tflops)} TFLOPS`), 1],
-      ['bf16_tflops', 'BF16 / FP16 tensor', (r) => (r.bf16_tflops == null ? null : `${fnum(r.bf16_tflops)} TFLOPS${r.bf16_is_fp16 ? ' (FP16, no BF16 support)' : ''}`), 1],
-      ['fp8_tflops', 'FP8 tensor', (r) => (r.fp8_tflops == null ? null : `${fnum(r.fp8_tflops)} TFLOPS`), 1],
-      ['fp4_tflops', 'FP4 tensor', (r) => (r.fp4_tflops == null ? null : `${fnum(r.fp4_tflops)} TFLOPS`), 1],
-      ['int8_tops', 'INT8 tensor', (r) => (r.int8_tops == null ? null : `${fnum(r.int8_tops)} TOPS`), 1]]],
-    ['Power & connectivity', [
-      ['tdp_w', 'Power (TDP)', (r) => (r.tdp_w == null ? null : `${fInt(r.tdp_w)} W`), 0],
-      ['scale_up', 'GPU-to-GPU link', (r) => r.scale_up || null, 0],
-      ['host_interface', 'Host interface', (r) => r.host_interface || null, 0],
-      ['multi_instance', 'Partitioning', (r) => r.multi_instance || null, 0]]],
-    ['Silicon & form factor', [
-      ['process_node', 'Process', (r) => r.process_node || null, 0],
-      ['transistors_b', 'Transistors', (r) => (r.transistors_b == null ? null : `${fnum(r.transistors_b)} billion`), 0],
-      ['die_note', 'Package', (r) => r.die_note || null, 0],
-      ['form_factor', 'Form factor', (r) => r.form_factor || null, 0]]],
-  ];
+  const UNIT = { memory_gb: 'GB', mem_bw_tbs: 'TB/s', fp64_tflops: 'TFLOPS', fp32_tflops: 'TFLOPS', tf32_tflops: 'TFLOPS', bf16_tflops: 'TFLOPS', fp8_tflops: 'TFLOPS', fp4_tflops: 'TFLOPS', int8_tops: 'TOPS', tdp_w: 'W', eff: 'TFLOPS/W', int: 'FLOPs/byte' };
   const effOf = (r) => (r.bf16_tflops != null && r.tdp_w ? r.bf16_tflops / r.tdp_w : null);
   const intOf = (r) => (r.bf16_tflops != null && r.mem_bw_tbs ? r.bf16_tflops / r.mem_bw_tbs : null);
-  const SHEET_METRICS = [
-    ['memory_gb', 'Memory', 'GB', (r) => r.memory_gb, 1],
-    ['mem_bw_tbs', 'Bandwidth', 'TB/s', (r) => r.mem_bw_tbs, 1],
-    ['bf16_tflops', 'BF16', 'TFLOPS', (r) => r.bf16_tflops, 1],
-    ['fp8_tflops', 'FP8', 'TFLOPS', (r) => r.fp8_tflops, 1],
-    ['fp4_tflops', 'FP4', 'TFLOPS', (r) => r.fp4_tflops, 1],
-    ['tdp_w', 'Power', 'W', (r) => r.tdp_w, 0],
-    ['eff', 'BF16 per watt', 'TFLOPS/W', effOf, 1],
-  ];
-  const SHEET_COLS = [
-    ['model', 'GPU', 'model', ''], ['arch', 'Architecture', 'arch', 'hide-narrow'], ['memory_gb', 'Memory', 'n', ''], ['mem_bw_tbs', 'Bandwidth', 'n', 'hide-narrow'],
-    ['bf16_tflops', 'BF16', 'n', ''], ['fp8_tflops', 'FP8', 'n', 'hide-narrow'], ['fp4_tflops', 'FP4', 'n', 'hide-narrow'], ['tdp_w', 'Power', 'n', ''],
-  ];
-  const specKey = (r) => r.model;
+  const gv = (r, k) => (k === 'eff' ? effOf(r) : k === 'int' ? intOf(r) : r[k]);
+  const fv = (k, x) => (x == null ? '—' : `${k === 'tdp_w' ? fInt(x) : fnum(x)} ${UNIT[k]}`);
+  const GMET = [['memory_gb', 'Memory'], ['mem_bw_tbs', 'Bandwidth'], ['bf16_tflops', 'BF16'], ['fp8_tflops', 'FP8'], ['fp4_tflops', 'FP4'], ['tdp_w', 'Power'], ['eff', 'BF16 per watt']];
+  const PREC = [['fp64_tflops', 'FP64', 'Scientific and HPC'], ['fp32_tflops', 'FP32', 'General compute'], ['tf32_tflops', 'TF32 tensor', 'Classic training default'], ['bf16_tflops', 'BF16 / FP16 tensor', 'Mixed-precision training'], ['fp8_tflops', 'FP8 tensor', 'Fast training and inference'], ['fp4_tflops', 'FP4 tensor', 'Lowest-precision inference'], ['int8_tops', 'INT8 tensor', 'Quantized inference']];
+  const SCOLS = [['model', 'GPU', 'model', ''], ['arch', 'Architecture', 'arch', 'hide-narrow'], ['memory_gb', 'Memory', 'n', ''], ['mem_bw_tbs', 'Bandwidth', 'n', 'hide-narrow'], ['bf16_tflops', 'BF16', 'n', ''], ['fp8_tflops', 'FP8', 'n', 'hide-narrow'], ['fp4_tflops', 'FP4', 'n', 'hide-narrow'], ['tdp_w', 'Power', 'n', '']];
+  const PRESETS = [['H100 vs H200 vs B200', ['H100 SXM 80GB', 'H200 SXM 141GB', 'B200 SXM']], ['NVIDIA vs AMD flagships', ['H100 SXM 80GB', 'MI300X', 'MI325X']], ['Inference cards', ['L4 24GB', 'L40S 48GB', 'RTX PRO 6000 Server 96GB']], ['Desktop cards', ['RTX 4090 24GB', 'RTX 5090 32GB', 'RTX 6000 Ada 48GB']], ['Cloud accelerators', ['H100 SXM 80GB', 'TPU v6e (Trillium)', 'Trainium2']]];
+  const mkEl = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+  const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (_) { return u; } };
+  const wideMQ = matchMedia('(min-width:900px)');
   let sheetCache = null;
   function sheetRows(v) {
     const d = dash.data('gpu_specs'); if (d.status !== 'ok' || !Array.isArray(d.data)) return null;
-    if (sheetCache && sheetCache.src === d.data && sheetCache.fi === v.famInfo) return sheetCache.rows;
+    if (sheetCache && sheetCache.src === d.data && sheetCache.fi === v.famInfo) return sheetCache;
     const rows = d.data.map((r) => { const fi = v.famInfo.get(r.family) || {}; return { ...r, seg: fi.segment || r.segment || 'Other', vendor: r.vendor || fi.vendor, arch: r.arch || fi.arch, year: r.release_year || fi.year }; });
-    sheetCache = { src: d.data, fi: v.famInfo, rows }; return rows;
+    const keys = [...PREC.map((p) => p[0]), 'memory_gb', 'mem_bw_tbs', 'tdp_w', 'eff', 'int']; const stat = {};
+    keys.forEach((k) => { const vals = rows.map((r) => gv(r, k)).filter((x) => x != null).sort((a, b) => b - a); stat[k] = { max: vals[0] || 1, vals }; });
+    sheetCache = { src: d.data, fi: v.famInfo, rows, stat }; return sheetCache;
   }
-  const mkEl = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
-  const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (_) { return u; } };
+  const rankOf = (S, k, x) => (x == null ? null : S.stat[k].vals.findIndex((y) => y <= x) + 1);
   function priceStat(v, fam) {
     const a = v.prices.filter((r) => r.family === fam && r.usd != null); if (!a.length) return null;
     const mins = d3.rollups(a, (x) => d3.min(x, (r) => r.usd), (r) => r.provider).map((x) => x[1]);
     return { n: mins.length, med: d3.median(mins) };
   }
+  const SORTED = (rows) => rows.slice().sort((a, b) => (SEG_RANK[a.seg] ?? 9) - (SEG_RANK[b.seg] ?? 9) || (b.year - a.year) || d3.descending(a.bf16_tflops ?? -1, b.bf16_tflops ?? -1) || d3.ascending(a.model, b.model));
+  const cmpList = (rows) => String(P().cmp || '').split('|').filter(Boolean).filter((m) => rows.some((r) => r.model === m)).slice(0, 4);
+  const setCmp = (arr) => set({ cmp: arr.length ? arr.join('|') : null });
+  const jump = (el, off) => { if (!el) return; const y = el.getBoundingClientRect().top + window.scrollY - (off ?? 64); window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' }); };
+  function selectGpu(model) { set({ gpu: model, gview: null }); requestAnimationFrame(() => requestAnimationFrame(() => jump($('#gpu-detail')))); }
+
   function drawSheet(v) {
-    const rows = sheetRows(v); const box = $('#sheet-body'); const q = P();
-    if (!rows) { const st = dash.data('gpu_specs').status; $('#sheet-count').textContent = st === 'ok' ? '' : st === 'loading' ? 'Loading datasheet…' : 'The datasheet could not be loaded.'; box.hidden = true; return; }
-    box.hidden = false;
+    const S = sheetRows(v); const root2 = $('#datasheet'); const q = P();
+    if (!S) { const st = dash.data('gpu_specs').status; $('#sheet-count').textContent = st === 'loading' ? 'Loading datasheet…' : st === 'ok' ? '' : 'The datasheet could not be loaded. Please refresh.'; $('#sheet-body').hidden = true; return; }
+    $('#sheet-body').hidden = false; const rows = S.rows;
+    const view = ['compare', 'rank'].includes(q.gview) ? q.gview : 'sheet';
+    document.querySelectorAll('#ds-views button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.v === view)));
+    ['sheet', 'compare', 'rank'].forEach((id) => { $('#sv-' + id).hidden = id !== view; });
     const segs = [...new Set(rows.map((r) => r.seg))].sort((a, b) => (SEG_RANK[a] ?? 9) - (SEG_RANK[b] ?? 9));
     const vends = VENDORS.filter((x) => rows.some((r) => r.vendor === x));
     const seg = segs.includes(q.gseg) ? q.gseg : null, ven = vends.includes(q.gvend) ? q.gvend : null, s = String(q.gq || '').toLowerCase().trim();
     const sq = $('#sheet-q'); if (document.activeElement !== sq && sq.value !== (q.gq || '')) sq.value = q.gq || '';
-    // segment + vendor chips
-    const chipRow = (el, label, items, cur, key) => {
-      el.replaceChildren(); const l = mkEl('span', 'cl', label); el.append(l);
-      [[null, 'All'], ...items.map((x) => [x, x])].forEach(([val, t]) => { const b = mkEl('button', null, t); b.type = 'button'; b.setAttribute('aria-pressed', String(val === cur)); b.onclick = () => set({ [key]: val }); el.append(b); });
-    };
+    const chipRow = (el, label, items, cur, key) => { el.replaceChildren(mkEl('span', 'cl', label)); [[null, 'All'], ...items.map((x) => [x, x])].forEach(([val, t]) => { const b = mkEl('button', null, t); b.type = 'button'; b.setAttribute('aria-pressed', String(val === cur)); b.onclick = () => set({ [key]: val }); el.append(b); }); };
     chipRow($('#sheet-seg'), 'Segment', segs, seg, 'gseg'); chipRow($('#sheet-ven'), 'Vendor', vends, ven, 'gvend');
-    const match = (r) => (!seg || r.seg === seg) && (!ven || r.vendor === ven) && (!s || `${r.model} ${r.family} ${r.arch} ${r.vendor}`.toLowerCase().includes(s));
-    let list = rows.filter(match);
-    const sk = SHEET_COLS.some((c) => c[0] === q.gsort) ? q.gsort : null, dir = q.gdir === 'asc' ? 'asc' : 'desc';
-    list.sort((a, b) => {
-      if (!sk) return (SEG_RANK[a.seg] ?? 9) - (SEG_RANK[b.seg] ?? 9) || (b.year - a.year) || d3.descending(a.bf16_tflops ?? -1, b.bf16_tflops ?? -1) || d3.ascending(a.model, b.model);
-      const x = sk === 'model' || sk === 'arch' ? String(a[sk] || '').toLowerCase() : a[sk], y = sk === 'model' || sk === 'arch' ? String(b[sk] || '').toLowerCase() : b[sk];
-      if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1; return dir === 'asc' ? d3.ascending(x, y) : d3.descending(x, y);
-    });
-    $('#sheet-count').textContent = `${plural(list.length, 'GPU')}${list.length !== rows.length ? ` of ${rows.length}` : ''} · per-GPU, dense (no sparsity) figures from vendor datasheets`;
-    $('#sheet-empty').hidden = list.length > 0;
-    // chart
-    const mk = SHEET_METRICS.find((m) => m[0] === q.gmetric) || SHEET_METRICS[2];
-    const mb = $('#sheet-metric'); mb.replaceChildren(); SHEET_METRICS.forEach((m) => { const b = mkEl('button', null, m[1]); b.type = 'button'; b.setAttribute('aria-pressed', String(m[0] === mk[0])); b.onclick = () => set({ gmetric: m[0] }); mb.append(b); });
-    const cd = list.map((r) => ({ r, x: mk[3](r) })).filter((d) => d.x != null).sort((a, b) => b.x - a.x);
-    const mx = d3.max(cd, (d) => d.x) || 1; const ch = $('#sheet-chart'); ch.replaceChildren();
-    $('#sheet-chart-sub').textContent = `${mk[1]} (${mk[2]}) · ${plural(cd.length, 'GPU')} with a published figure${cd.length < list.length ? `, ${list.length - cd.length} without` : ''}`;
-    cd.forEach((d) => {
-      const row = mkEl('button', 'gx-shr' + (q.gpu === d.r.model ? ' on' : '')); row.type = 'button'; row.title = `Open ${d.r.model}`;
-      const nm = mkEl('span', 'nm'); const dot = mkEl('i'); dot.style.background = vColor(d.r.vendor); nm.append(dot, document.createTextNode(d.r.model));
-      const bar = mkEl('span', 'bar'); const fill = mkEl('span'); fill.style.width = Math.max(1.5, (d.x / mx) * 100) + '%'; fill.style.background = vColor(d.r.vendor); bar.append(fill);
-      row.append(nm, bar, mkEl('span', 'val', fnum(d.x))); row.onclick = () => openGpu(d.r.model); ch.append(row);
-    });
-    if (!cd.length) ch.append(mkEl('p', 'gx-note', 'No GPU in this view has a published figure for this metric.'));
-    // legend
-    const lg = $('#sheet-legend'); lg.replaceChildren(); vends.filter((x) => cd.some((d) => d.r.vendor === x)).forEach((x) => { const s2 = mkEl('span'); const i = mkEl('i'); i.style.background = vColor(x); s2.append(i, document.createTextNode(x)); lg.append(s2); });
-    // table
-    document.querySelectorAll('#sheet thead th').forEach((th) => { const b = th.querySelector('button[data-s]'); if (b) th.setAttribute('aria-sort', b.dataset.s === sk ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'); });
-    const cmp = String(q.cmp || '').split('|').filter(Boolean).filter((m) => rows.some((r) => r.model === m)).slice(0, 4);
-    $('#sheet tbody').replaceChildren(...list.map((r) => {
-      const tr = document.createElement('tr'); tr.dataset.key = r.model; tr.tabIndex = 0; if (q.gpu === r.model) tr.className = 'on';
-      tr.onkeydown = (e) => { if (e.key === 'Enter' && e.target === tr) tr.click(); };
-      const c0 = document.createElement('td'); c0.className = 'cmp'; const cb = mkEl('button', 'gx-cmpb'); cb.type = 'button'; const on = cmp.includes(r.model);
-      cb.setAttribute('aria-pressed', String(on)); cb.setAttribute('aria-label', (on ? 'Remove from compare: ' : 'Add to compare: ') + r.model); cb.title = on ? 'Remove from compare' : cmp.length >= 4 ? 'Compare is full (4 GPUs)' : 'Add to compare'; cb.append(ICON('check'));
-      cb.onclick = (e) => { e.stopPropagation(); const next = on ? cmp.filter((m) => m !== r.model) : cmp.length >= 4 ? cmp : [...cmp, r.model]; set({ cmp: next.length ? next.join('|') : null }); }; c0.append(cb); tr.append(c0);
-      SHEET_COLS.forEach(([k, , kind, cls]) => {
-        const td = document.createElement('td'); td.className = [kind === 'n' ? 'n' : '', cls].filter(Boolean).join(' ');
-        if (k === 'model') { const nm = mkEl('span', 'gx-shn'); const dot = mkEl('i'); dot.style.background = vColor(r.vendor); const b = mkEl('b', null, r.model); const sm = mkEl('small', null, `${r.vendor} · ${r.seg}`); const w = mkEl('span'); w.append(b, sm); nm.append(dot, w); td.append(nm); }
-        else if (k === 'arch') td.textContent = `${r.arch || '—'}${r.year ? ' · ' + r.year : ''}`;
-        else if (k === 'memory_gb') td.textContent = r.memory_gb == null ? '—' : `${fnum(r.memory_gb)} GB`;
-        else if (k === 'mem_bw_tbs') td.textContent = r.mem_bw_tbs == null ? '—' : `${fnum(r.mem_bw_tbs)} TB/s`;
-        else if (k === 'tdp_w') td.textContent = r.tdp_w == null ? '—' : `${fInt(r.tdp_w)} W`;
-        else td.textContent = fnum(r[k]);
-        tr.append(td);
-      });
-      tr.onclick = () => openGpu(r.model); return tr;
-    }));
-    // compare + detail
-    drawCompare(rows, cmp); drawGpuDetail(v, rows);
+    const list = SORTED(rows.filter((r) => (!seg || r.seg === seg) && (!ven || r.vendor === ven) && (!s || `${r.model} ${r.full_name} ${r.family} ${r.arch} ${r.vendor}`.toLowerCase().includes(s))));
+    $('#sheet-count').textContent = `${plural(list.length, 'GPU')}${list.length !== rows.length ? ` of ${rows.length}` : ''} · per-GPU, dense figures from vendor datasheets`;
+    $('#sheet-empty').hidden = list.length > 0 || view === 'compare';
+    const cmp = cmpList(rows);
+    const wide = wideMQ.matches;
+    const cur = rows.find((r) => r.model === q.gpu) || (wide && view === 'sheet' ? (list.find((r) => r.model === 'H100 SXM 80GB') || list[0] || rows[0]) : null);
+    root2.dataset.m = cur && (q.gpu || wide) ? 'detail' : 'list';
+    if (view === 'sheet') { drawList(list, cur, cmp, rows); if (cur) drawDetail(v, S, cur, list, cmp); else $('#gpu-detail').replaceChildren(); }
+    if (view === 'compare') drawCompare(S, rows, cmp);
+    if (view === 'rank') drawRank(S, list, q);
   }
-  function openGpu(model) { set({ gpu: model }); requestAnimationFrame(() => { const d = $('#gpu-detail'); if (d && !d.hidden) d.scrollIntoView({ block: 'start', behavior: 'smooth' }); }); }
-  function drawCompare(rows, cmp) {
-    const el = $('#sheet-cmp'); const sel = cmp.map((m) => rows.find((r) => r.model === m)).filter(Boolean);
-    el.hidden = sel.length < 1; if (sel.length < 1) { el.replaceChildren(); return; }
-    el.replaceChildren(); const head = mkEl('div', 'gx-shch'); const t = mkEl('div'); t.append(mkEl('h3', null, 'Compare'), mkEl('p', 'gx-note', sel.length < 2 ? 'Tick one more GPU in the table to compare side by side.' : 'Best value in each row is highlighted. Figures are per GPU, dense.'));
-    const clr = mkEl('button', 'gx-btn', 'Clear'); clr.type = 'button'; clr.onclick = () => set({ cmp: null }); head.append(t, clr); el.append(head);
+
+  function drawList(list, cur, cmp, rows) {
+    const ul = $('#sheet-ul'); ul.replaceChildren(); let lastSeg = null;
+    $('#sheet-list-h').replaceChildren(mkEl('b', null, plural(list.length, 'GPU')), ...(cmp.length ? [(() => { const b = mkEl('button', 'gx-btn gx-sm', `Compare ${cmp.length}`); b.type = 'button'; b.onclick = () => set({ gview: 'compare' }); return b; })()] : []));
+    list.forEach((r) => {
+      if (r.seg !== lastSeg) { lastSeg = r.seg; const h = mkEl('li', 'gx-lg', r.seg); h.setAttribute('role', 'presentation'); ul.append(h); }
+      const li = mkEl('li', 'gx-li' + (cur && cur.model === r.model ? ' on' : ''));
+      const b = mkEl('button', 'gx-lr'); b.type = 'button'; if (cur && cur.model === r.model) b.setAttribute('aria-current', 'true');
+      const dot = mkEl('i'); dot.style.background = vColor(r.vendor);
+      const t = mkEl('span', 'gx-lt'); t.append(mkEl('b', null, r.model), mkEl('small', null, [r.memory_gb != null ? `${fnum(r.memory_gb)} GB` : null, r.bf16_tflops != null ? `${fnum(r.bf16_tflops)} TFLOPS` : null, r.tdp_w ? `${fInt(r.tdp_w)} W` : null].filter(Boolean).join(' · ') || `${r.vendor} ${r.arch || ''}`));
+      b.append(dot, t); b.onclick = () => selectGpu(r.model);
+      b.onkeydown = (e) => { if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return; e.preventDefault(); const bs = [...ul.querySelectorAll('.gx-lr')]; const n = bs[bs.indexOf(b) + (e.key === 'ArrowDown' ? 1 : -1)]; if (n) n.focus(); };
+      const on = cmp.includes(r.model); const c = mkEl('button', 'gx-lc'); c.type = 'button'; c.setAttribute('aria-pressed', String(on)); c.setAttribute('aria-label', (on ? 'Remove from compare: ' : 'Add to compare: ') + r.model); c.title = on ? 'Remove from compare' : cmp.length >= 4 ? 'Compare is full (4 GPUs)' : 'Add to compare'; c.append(ICON(on ? 'check' : 'plus'));
+      c.onclick = () => setCmp(on ? cmp.filter((m) => m !== r.model) : cmp.length >= 4 ? cmp : [...cmp, r.model]);
+      li.append(b, c); ul.append(li);
+    });
+    const on = ul.querySelector('.gx-li.on'); if (on && wideMQ.matches) { const t = on.offsetTop - ul.offsetTop - ul.clientHeight / 2 + on.offsetHeight / 2; ul.scrollTop = Math.max(0, t); }
+  }
+
+  function drawDetail(v, S, r, list, cmp) {
+    const el = $('#gpu-detail'); el.replaceChildren();
+    const idx = list.findIndex((x) => x.model === r.model);
+    // hero
+    const hero = mkEl('div', 'gx-gh');
+    const top = mkEl('div', 'gx-gh-top');
+    const back = mkEl('button', 'gx-btn gx-sm gx-back'); back.type = 'button'; back.append(ICON('back'), document.createTextNode('All GPUs')); back.onclick = () => { set({ gpu: null }); requestAnimationFrame(() => jump($('#datasheet'), 70)); }; top.append(back);
+    const nav2 = mkEl('div', 'gx-gh-nav');
+    [['prev', -1, 'Previous GPU'], ['next', 1, 'Next GPU']].forEach(([ic, d, lab]) => { const b = mkEl('button', 'gx-ibtn'); b.type = 'button'; b.setAttribute('aria-label', lab); b.title = lab; b.append(ICON(ic)); const t = list[idx + d]; b.disabled = idx < 0 || !t; if (t) b.onclick = () => selectGpu(t.model); nav2.append(b); });
+    if (idx >= 0) nav2.prepend(mkEl('span', 'gx-gh-pos', `${idx + 1} of ${list.length}`));
+    top.append(nav2); hero.append(top);
+    const h = mkEl('h2', 'gx-gh-name', r.model); hero.append(h);
+    if (r.full_name && r.full_name !== r.model) hero.append(mkEl('p', 'gx-gh-full', r.full_name));
+    const chips = mkEl('div', 'gx-gh-chips');
+    const c1 = mkEl('span', 'gx-pill'); const dot = mkEl('i'); dot.style.background = vColor(r.vendor); c1.append(dot, document.createTextNode(`${r.vendor} ${r.arch || ''}`)); chips.append(c1);
+    [r.year ? `Released ${r.year}` : null, r.seg, r.form_factor].filter(Boolean).forEach((t) => chips.append(mkEl('span', 'gx-pill', t)));
+    const conf = { high: ['ok', 'High confidence'], medium: ['mid', 'Medium confidence'], low: ['low', 'Low confidence'] }[r.confidence]; if (conf) { const c = mkEl('span', 'gx-pill gx-conf ' + conf[0], conf[1]); c.title = 'How well the figures are backed by vendor documents. See notes below.'; chips.append(c); }
+    hero.append(chips);
+    if (r.summary) hero.append(mkEl('p', 'gx-gh-sum', r.summary));
+    if (r.best_for && r.best_for.length) { const bf = mkEl('div', 'gx-gh-bf'); bf.append(mkEl('span', null, 'Best for')); r.best_for.forEach((t) => bf.append(mkEl('em', null, t))); hero.append(bf); }
+    const act = mkEl('div', 'gx-gh-act'); const ps = priceStat(v, r.family);
+    if (ps && v.famInfo.has(r.family)) { const b = mkEl('button', 'gx-btn gx-pri'); b.type = 'button'; b.append(ICON('tag'), document.createTextNode(`Rent ${r.family}: ${plural(ps.n, 'provider')}, median ${f$(ps.med)}/hr`)); b.onclick = () => set({ family: r.family, vendor: null, tab: 'pricing', csort: 'usd', cdir: 'asc' }); act.append(b); }
+    const on = cmp.includes(r.model); const cb = mkEl('button', 'gx-btn'); cb.type = 'button'; cb.setAttribute('aria-pressed', String(on)); cb.append(ICON(on ? 'check' : 'plus'), document.createTextNode(on ? 'In compare' : 'Add to compare')); cb.onclick = () => setCmp(on ? cmp.filter((m) => m !== r.model) : cmp.length >= 4 ? cmp : [...cmp, r.model]); act.append(cb);
+    if (cmp.length) { const g = mkEl('button', 'gx-btn gx-ghost', `Open compare (${cmp.length})`); g.type = 'button'; g.onclick = () => set({ gview: 'compare' }); act.append(g); }
+    hero.append(act); el.append(hero);
+    // section nav
+    const sn = mkEl('nav', 'gx-sn'); sn.setAttribute('aria-label', 'Datasheet sections');
+    [['gs-key', 'Key figures'], ['gs-compute', 'Compute'], ['gs-mem', 'Memory and links'], ['gs-si', 'Silicon and power'], ['gs-bm', 'Benchmarks'], ['gs-src', 'Notes and sources']].forEach(([id, t]) => { const a = mkEl('button', null, t); a.type = 'button'; a.onclick = () => jump(document.getElementById(id), 118); sn.append(a); });
+    el.append(sn);
+    // key figures
+    const kf = mkEl('section', 'gx-gs'); kf.id = 'gs-key'; kf.append(mkEl('h3', null, 'Key figures'));
+    const tiles = mkEl('div', 'gx-tiles');
+    [['memory_gb', 'Memory', r.memory_type], ['mem_bw_tbs', 'Bandwidth', null], ['bf16_tflops', r.bf16_is_fp16 ? 'FP16 tensor' : 'BF16 tensor', 'dense'], ['fp8_tflops', 'FP8 tensor', 'dense'], ['tdp_w', 'Power (TDP)', null], ['eff', 'BF16 per watt', 'efficiency']].forEach(([k, lab, sub]) => {
+      const x = gv(r, k); const t = mkEl('div', 'gx-tile' + (x == null ? ' na' : '')); t.append(mkEl('span', 'l', lab));
+      const val = mkEl('b'); if (x == null) val.textContent = 'Not published'; else { val.append(document.createTextNode(k === 'tdp_w' ? fInt(x) : fnum(x)), mkEl('small', null, ' ' + UNIT[k])); }
+      t.append(val);
+      const bar = mkEl('span', 'bar'); const f = mkEl('i'); f.style.width = x == null ? '0%' : Math.max(2, (x / S.stat[k].max) * 100) + '%'; f.style.background = vColor(r.vendor); bar.append(f); t.append(bar);
+      const rk = k === 'tdp_w' ? null : rankOf(S, k, x);
+      t.append(mkEl('span', 's', x == null ? (sub || '') : k === 'tdp_w' ? `${Math.round((x / S.stat[k].max) * 100)}% of the highest (${fInt(S.stat[k].max)} W)` : `#${rk} of ${S.stat[k].vals.length}${sub ? ' · ' + sub : ''}`));
+      tiles.append(t);
+    }); kf.append(tiles); el.append(kf);
+    // compute
+    const cs = mkEl('section', 'gx-gs'); cs.id = 'gs-compute'; cs.append(mkEl('h3', null, 'Compute by precision'), mkEl('p', 'gx-note', 'Per GPU, dense tensor throughput. Bars compare against the best GPU in the tracker for each precision.'));
+    const pl = mkEl('div', 'gx-prec');
+    PREC.forEach(([k, lab, hint]) => {
+      const x = r[k]; const row = mkEl('div', 'gx-pr' + (x == null ? ' na' : '')); const l = mkEl('span', 'pl'); l.append(mkEl('b', null, k === 'bf16_tflops' && r.bf16_is_fp16 ? 'FP16 tensor' : lab), mkEl('small', null, hint));
+      const bar = mkEl('span', 'bar'); const f = mkEl('i'); f.style.width = x == null ? '0%' : Math.max(1.5, (x / S.stat[k].max) * 100) + '%'; f.style.background = vColor(r.vendor); bar.append(f);
+      const val = mkEl('span', 'pv'); val.append(mkEl('b', null, x == null ? 'Not published' : fnum(x)), mkEl('small', null, x == null ? '' : `${UNIT[k]} · #${rankOf(S, k, x)}`)); row.append(l, bar, val); pl.append(row);
+    }); cs.append(pl);
+    const e = effOf(r), n = intOf(r);
+    if (e != null || n != null) { const dv = mkEl('div', 'gx-derived'); [['BF16 per watt', e, 'eff', 'Higher means more training or inference work per unit of power.'], ['Compute per byte of bandwidth', n, 'int', 'Higher means workloads need more data reuse to keep the GPU busy; lower suits memory-bound inference.']].forEach(([l, x, k, tip]) => { if (x == null) return; const d = mkEl('div'); d.append(mkEl('span', null, l), mkEl('b', null, `${fnum(x)} ${UNIT[k]}`), mkEl('small', null, tip)); dv.append(d); }); cs.append(dv); }
+    el.append(cs);
+    // dl helper
+    const dl = (id, title, items) => { const sec = mkEl('section', 'gx-gs'); sec.id = id; sec.append(mkEl('h3', null, title)); const d = mkEl('dl', 'gx-sp'); items.forEach(([l, val]) => { d.append(mkEl('dt', null, l), mkEl('dd', val == null ? 'na' : '', val == null ? 'Not published' : val)); }); sec.append(d); return sec; };
+    el.append(dl('gs-mem', 'Memory and connectivity', [['Capacity', r.memory_gb == null ? null : `${fnum(r.memory_gb)} GB`], ['Memory type', r.memory_type], ['Bandwidth', r.mem_bw_tbs == null ? null : `${fnum(r.mem_bw_tbs)} TB/s`], ['GPU-to-GPU link', r.scale_up], ['Host interface', r.host_interface], ['Partitioning', r.multi_instance]]));
+    el.append(dl('gs-si', 'Silicon and power', [['Architecture', r.arch ? `${r.arch}${r.year ? ', ' + r.year : ''}` : null], ['Process node', r.process_node], ['Transistors', r.transistors_b == null ? null : `${fnum(r.transistors_b)} billion`], ['Package', r.die_note], ['Form factor', r.form_factor], ['Power (TDP)', r.tdp_w == null ? null : `${fInt(r.tdp_w)} W`]]));
+    // benchmarks
+    const bs = mkEl('section', 'gx-gs'); bs.id = 'gs-bm'; bs.append(mkEl('h3', null, 'Published benchmarks'));
+    const bm = (r.benchmarks || []).filter((b) => b && b.result != null);
+    if (bm.length) { const bl = mkEl('div', 'gx-bms'); bm.forEach((b) => { const c = mkEl('div', 'gx-bm'); const big = mkEl('div', 'big'); big.append(mkEl('b', null, fInt(b.result)), mkEl('small', null, b.unit || '')); const m = mkEl('div', 'm'); m.append(mkEl('b', null, b.workload || b.suite), mkEl('span', null, b.suite)); if (b.config) m.append(mkEl('small', null, b.config)); if (/^https?:\/\//.test(b.source_url || '')) { const a = mkEl('a', null, `Source: ${hostOf(b.source_url)}`); a.href = b.source_url; a.target = '_blank'; a.rel = 'noopener'; m.append(a); } c.append(big, m); bl.append(c); }); bs.append(bl); }
+    else bs.append(mkEl('p', 'gx-empty-b', 'No official, citable benchmark result is published for this exact GPU, so none is shown rather than an estimate. The per-GPU figures above are the like-for-like way to compare it.'));
+    el.append(bs);
+    // notes + sources
+    const ns = mkEl('section', 'gx-gs'); ns.id = 'gs-src'; ns.append(mkEl('h3', null, 'Notes and sources'));
+    if (r.notes) { const d = mkEl('details', 'gx-det'); d.open = r.confidence === 'low'; d.append(mkEl('summary', null, 'How these figures were derived'), mkEl('p', null, r.notes)); ns.append(d); }
+    if (r.variants_note) ns.append(mkEl('p', 'gx-note', 'Other versions: ' + r.variants_note));
+    const srcs = (r.sources || []).filter((u) => /^https?:\/\//.test(u));
+    if (srcs.length) { const sl = mkEl('div', 'gx-srcs'); srcs.forEach((u) => { const a = mkEl('a', null, hostOf(u)); a.href = u; a.target = '_blank'; a.rel = 'noopener'; a.append(ICON('ext')); sl.append(a); }); ns.append(sl); }
+    // similar GPUs
+    const sim = S.rows.filter((x) => x.model !== r.model && (x.family === r.family || (x.vendor === r.vendor && x.seg === r.seg))).slice(0, 6);
+    if (sim.length) { const sm = mkEl('div', 'gx-sim'); sm.append(mkEl('span', null, 'Similar GPUs')); sim.forEach((x) => { const b = mkEl('button', null, x.model); b.type = 'button'; b.onclick = () => selectGpu(x.model); sm.append(b); }); ns.append(sm); }
+    el.append(ns);
+  }
+
+  function drawCompare(S, rows, cmp) {
+    const el = $('#sheet-cmp'); el.replaceChildren(); const sel = cmp.map((m) => rows.find((r) => r.model === m)).filter(Boolean);
+    const head = mkEl('div', 'gx-shch'); const t = mkEl('div'); t.append(mkEl('h3', null, 'Compare GPUs'), mkEl('p', 'gx-note', 'Pick up to four. The best value in each row is highlighted; bars show each GPU relative to the highest of your selection.')); head.append(t); el.append(head);
+    // picker
+    const pk = mkEl('div', 'gx-pick'); const chips = mkEl('div', 'gx-pickc');
+    sel.forEach((r) => { const b = mkEl('button', 'gx-cmpx'); b.type = 'button'; b.setAttribute('aria-label', 'Remove ' + r.model); const dot = mkEl('i'); dot.style.background = vColor(r.vendor); b.append(dot, document.createTextNode(r.model), ICON('x')); b.onclick = () => setCmp(cmp.filter((m) => m !== r.model)); chips.append(b); });
+    pk.append(chips);
+    if (sel.length < 4) { const s = document.createElement('select'); s.className = 'gx-addsel'; s.setAttribute('aria-label', 'Add a GPU to compare'); s.append(new Option('+ Add a GPU…', '')); const g = d3.groups(SORTED(rows).filter((r) => !cmp.includes(r.model)), (r) => r.vendor); g.sort((a, b) => VENDORS.indexOf(a[0]) - VENDORS.indexOf(b[0])).forEach(([vd, a]) => { const og = document.createElement('optgroup'); og.label = vd; a.forEach((r) => og.append(new Option(r.model, r.model))); s.append(og); }); s.onchange = () => { if (s.value) setCmp([...cmp, s.value]); }; pk.append(s); }
+    if (sel.length) { const c = mkEl('button', 'gx-btn gx-sm', 'Clear'); c.type = 'button'; c.onclick = () => setCmp([]); pk.append(c); }
+    el.append(pk);
+    if (sel.length < 2) {
+      const ps = mkEl('div', 'gx-presets'); ps.append(mkEl('p', 'gx-note', sel.length ? 'Add one more GPU, or start from a ready-made comparison:' : 'Start from a ready-made comparison, or add GPUs above:'));
+      const wrap = mkEl('div', 'gx-prw'); PRESETS.forEach(([lab, ms]) => { const ok = ms.filter((m) => rows.some((r) => r.model === m)); if (ok.length < 2) return; const b = mkEl('button', null, lab); b.type = 'button'; b.onclick = () => setCmp(ok); wrap.append(b); }); ps.append(wrap); el.append(ps);
+      if (!sel.length) return;
+    }
+    if (sel.length < 2) return;
     const tb = mkEl('div', 'gx-tablebox gx-cmptb'); const tbl = document.createElement('table'); tbl.className = 'gx-cmpt';
     const th = document.createElement('thead'); const hr = document.createElement('tr'); hr.append(mkEl('th'));
-    sel.forEach((r) => { const c = document.createElement('th'); const b = mkEl('button', 'gx-cmpx'); b.type = 'button'; b.title = 'Remove ' + r.model; b.setAttribute('aria-label', 'Remove ' + r.model); const dot = mkEl('i'); dot.style.background = vColor(r.vendor); b.append(dot, document.createTextNode(r.model), ICON('x')); b.onclick = () => set({ cmp: sel.filter((x) => x !== r).map((x) => x.model).join('|') || null }); c.append(b); hr.append(c); });
+    sel.forEach((r) => { const c = document.createElement('th'); const b = mkEl('button', 'gx-cmpn'); b.type = 'button'; const dot = mkEl('i'); dot.style.background = vColor(r.vendor); b.append(dot, mkEl('b', null, r.model), mkEl('small', null, `${r.vendor} ${r.arch || ''}`)); b.onclick = () => selectGpu(r.model); b.title = 'Open datasheet'; c.append(b); hr.append(c); });
     th.append(hr); tbl.append(th); const tbd = document.createElement('tbody');
-    const line = (label, get, fmt, best) => { const tr = document.createElement('tr'); tr.append(mkEl('th', null, label)); const vals = sel.map(get); const nums = vals.filter((x) => typeof x === 'number'); const bv = best === 'max' && nums.length > 1 ? d3.max(nums) : best === 'min' && nums.length > 1 ? d3.min(nums) : null;
-      vals.forEach((x) => { const td = mkEl('td', x != null && bv != null && x === bv ? 'best' : x == null ? 'na' : '', x == null ? '—' : fmt(x)); tr.append(td); }); tbd.append(tr); };
-    [['Architecture', (r) => r.arch, (x) => x], ['Released', (r) => r.year, (x) => String(x)]].forEach((a) => line(...a));
-    line('Memory', (r) => r.memory_gb, (x) => `${fnum(x)} GB`, 'max'); line('Memory type', (r) => r.memory_type, (x) => x);
-    line('Bandwidth', (r) => r.mem_bw_tbs, (x) => `${fnum(x)} TB/s`, 'max');
-    [['FP64', 'fp64_tflops'], ['FP32', 'fp32_tflops'], ['TF32 tensor', 'tf32_tflops'], ['BF16 / FP16 tensor', 'bf16_tflops'], ['FP8 tensor', 'fp8_tflops'], ['FP4 tensor', 'fp4_tflops']].forEach(([l, k]) => line(l + ' (TFLOPS)', (r) => r[k], (x) => fnum(x), 'max'));
-    line('INT8 tensor (TOPS)', (r) => r.int8_tops, (x) => fnum(x), 'max');
-    line('Power (TDP)', (r) => r.tdp_w, (x) => `${fInt(x)} W`); line('BF16 per watt (TFLOPS/W)', effOf, (x) => fnum(x), 'max'); line('BF16 per TB/s of bandwidth', intOf, (x) => fnum(x));
-    line('GPU-to-GPU link', (r) => r.scale_up, (x) => x); line('Process', (r) => r.process_node, (x) => x);
+    const grp = (t) => { const tr = document.createElement('tr'); tr.className = 'g'; const td = mkEl('th', null, t); td.colSpan = sel.length + 1; tr.append(td); tbd.append(tr); };
+    const line = (label, k, kind) => { const tr = document.createElement('tr'); tr.append(mkEl('th', null, label)); const vals = sel.map((r) => gv(r, k)); const nums = vals.filter((x) => typeof x === 'number'); const mx = nums.length ? d3.max(nums) : 0; const bv = nums.length > 1 && kind === 'max' ? mx : nums.length > 1 && kind === 'min' ? d3.min(nums) : null;
+      vals.forEach((x) => { const td = document.createElement('td'); if (x == null) { td.className = 'na'; td.textContent = '—'; } else if (typeof x === 'number' && kind !== 't') { if (bv != null && x === bv) td.className = 'best'; td.append(mkEl('span', 'cv', fv(k, x))); if (kind !== 'n' && mx) { const bar = mkEl('span', 'mb'); const f = mkEl('i'); f.style.width = Math.max(3, (x / mx) * 100) + '%'; bar.append(f); td.append(bar); } } else td.textContent = String(x); tr.append(td); }); tbd.append(tr); };
+    grp('Overview'); line('Architecture', 'arch', 't'); line('Released', 'year', 't'); line('Segment', 'seg', 't');
+    grp('Memory'); line('Capacity', 'memory_gb', 'max'); line('Type', 'memory_type', 't'); line('Bandwidth', 'mem_bw_tbs', 'max');
+    grp('Compute (dense, per GPU)'); PREC.forEach(([k, l]) => line(l, k, 'max'));
+    grp('Power and efficiency'); line('Power (TDP)', 'tdp_w', 'min'); line('BF16 per watt', 'eff', 'max'); line('BF16 per TB/s', 'int', 'n');
+    grp('Connectivity and silicon'); line('GPU-to-GPU link', 'scale_up', 't'); line('Process', 'process_node', 't');
     tbl.append(tbd); tb.append(tbl); el.append(tb);
   }
-  function drawGpuDetail(v, rows) {
-    const el = $('#gpu-detail'); const r = rows.find((x) => x.model === P().gpu);
-    if (!r) { el.hidden = true; el.replaceChildren(); return; }
-    el.hidden = false; el.replaceChildren();
-    const head = mkEl('div', 'gx-pf-head'); const id = mkEl('div', 'gx-pf-id'); const tw = mkEl('div'); tw.append(mkEl('h3', null, r.model));
-    const meta = mkEl('div', 'gx-pf-meta'); const a1 = mkEl('span'); const dot = mkEl('i', 'gx-vd'); dot.style.background = vColor(r.vendor); a1.append(dot, document.createTextNode(`${r.vendor} ${r.arch || ''}${r.year ? ' · ' + r.year : ''}`)); meta.append(a1);
-    const a2 = mkEl('span'); a2.append(ICON('layers'), r.seg); meta.append(a2); if (r.form_factor) { const a3 = mkEl('span'); a3.append(ICON('cpu'), r.form_factor); meta.append(a3); }
-    tw.append(meta); id.append(tw); head.append(id);
-    const act = mkEl('div', 'gx-pf-act'); const ps = priceStat(v, r.family);
-    if (ps && v.famInfo.has(r.family)) { const b = mkEl('button', 'gx-btn gx-pri'); b.type = 'button'; b.append(ICON('tag'), document.createTextNode(`Rent ${r.family}: ${plural(ps.n, 'provider')}, median ${f$(ps.med)}/hr`)); b.onclick = () => set({ family: r.family, vendor: null, tab: 'pricing', csort: 'usd', cdir: 'asc' }); act.append(b); }
-    const x = mkEl('button', 'gx-ibtn'); x.type = 'button'; x.setAttribute('aria-label', 'Close datasheet'); x.title = 'Close'; x.append(ICON('x')); x.onclick = () => set({ gpu: null }); act.append(x); head.append(act); el.append(head);
-    if (r.summary) el.append(mkEl('p', 'gx-shsum', r.summary));
-    const st = mkEl('div', 'gx-pf-stats');
-    [['Memory', r.memory_gb == null ? '—' : `${fnum(r.memory_gb)} GB`, r.memory_type || ''], ['Bandwidth', r.mem_bw_tbs == null ? '—' : `${fnum(r.mem_bw_tbs)} TB/s`, ''], [r.bf16_is_fp16 ? 'FP16' : 'BF16 tensor', r.bf16_tflops == null ? '—' : `${fnum(r.bf16_tflops)} TFLOPS`, 'dense'], ['FP8 tensor', r.fp8_tflops == null ? '—' : `${fnum(r.fp8_tflops)} TFLOPS`, r.fp4_tflops != null ? `FP4 ${fnum(r.fp4_tflops)}` : 'dense'], ['Power', r.tdp_w == null ? '—' : `${fInt(r.tdp_w)} W`, effOf(r) != null ? `${fnum(effOf(r))} TFLOPS/W` : '']]
-      .forEach(([l, val, sub]) => { const d = mkEl('div'); d.append(mkEl('span', null, l), mkEl('b', null, val)); if (sub) d.append(mkEl('small', null, sub)); st.append(d); });
-    el.append(st);
-    const grid = mkEl('div', 'gx-shgrid');
-    SHEET_FIELDS.forEach(([title, fields]) => {
-      const sec = mkEl('div', 'gx-shsec'); sec.append(mkEl('h4', null, title)); const dl = mkEl('dl');
-      fields.forEach(([, label, get]) => { const val = get(r); dl.append(mkEl('dt', null, label)); const dd = mkEl('dd', val == null ? 'na' : '', val == null ? 'Not published' : val); dl.append(dd); });
-      if (title.startsWith('Compute')) { const e = effOf(r), n = intOf(r); [['BF16 per watt', e == null ? null : `${fnum(e)} TFLOPS/W`], ['BF16 per TB/s', n == null ? null : `${fnum(n)} FLOPs per byte`]].forEach(([l, val]) => { dl.append(mkEl('dt', 'dv', l + ' (derived)')); dl.append(mkEl('dd', val == null ? 'na dv' : 'dv', val == null ? '—' : val)); }); }
-      sec.append(dl); grid.append(sec);
-    });
-    el.append(grid);
-    const bm = (r.benchmarks || []).filter((b) => b && b.result != null);
-    const bs = mkEl('div', 'gx-shsec gx-shbm'); bs.append(mkEl('h4', null, 'Published benchmarks'));
-    if (bm.length) { const ul = mkEl('ul'); bm.forEach((b) => { const li = mkEl('li'); const t = mkEl('b', null, `${b.result}${b.unit ? ' ' + b.unit : ''}`); const w = mkEl('span', null, ` ${[b.suite, b.workload].filter(Boolean).join(' · ')}`); li.append(t, w); if (b.config) li.append(mkEl('small', null, b.config)); if (/^https?:\/\//.test(b.source_url || '')) { const a = mkEl('a', null, hostOf(b.source_url)); a.href = b.source_url; a.target = '_blank'; a.rel = 'noopener'; li.append(a); } ul.append(li); }); bs.append(ul); }
-    else bs.append(mkEl('p', 'gx-note', 'No official, citable benchmark result is published for this exact GPU. Compare the per-GPU figures above instead.'));
-    el.append(bs);
-    const foot = mkEl('div', 'gx-shfoot');
-    if (r.notes) foot.append(mkEl('p', 'gx-note', r.notes)); if (r.variants_note) foot.append(mkEl('p', 'gx-note', 'Other versions: ' + r.variants_note));
-    const srcs = (r.sources || []).filter((u) => /^https?:\/\//.test(u));
-    if (srcs.length) { const p = mkEl('p', 'gx-note gx-shsrc', 'Sources: '); srcs.forEach((u, i) => { const a = mkEl('a', null, hostOf(u)); a.href = u; a.target = '_blank'; a.rel = 'noopener'; p.append(a); if (i < srcs.length - 1) p.append(document.createTextNode(' · ')); }); foot.append(p); }
-    el.append(foot);
+
+  function drawRank(S, list, q) {
+    const mk = GMET.find((m) => m[0] === q.gmetric) || GMET[2]; const k = mk[0];
+    const mb = $('#sheet-metric'); mb.replaceChildren(); GMET.forEach((m) => { const b = mkEl('button', null, m[1]); b.type = 'button'; b.setAttribute('aria-pressed', String(m[0] === k)); b.onclick = () => set({ gmetric: m[0] }); mb.append(b); });
+    const asc = k === 'tdp_w'; const cd = list.map((r) => ({ r, x: gv(r, k) })).filter((d) => d.x != null).sort((a, b) => (asc ? a.x - b.x : b.x - a.x));
+    const mx = d3.max(cd, (d) => d.x) || 1; const ch = $('#sheet-chart'); ch.replaceChildren();
+    $('#sheet-chart-sub').textContent = `${mk[1]} (${UNIT[k]}) · ${asc ? 'lowest first' : 'highest first'} · ${plural(cd.length, 'GPU')} with a published figure${cd.length < list.length ? `, ${list.length - cd.length} without` : ''}`;
+    cd.forEach((d, i) => { const row = mkEl('button', 'gx-shr'); row.type = 'button'; row.title = `Open ${d.r.model}`; const nm = mkEl('span', 'nm'); const dot = mkEl('i'); dot.style.background = vColor(d.r.vendor); nm.append(mkEl('em', null, String(i + 1)), dot, document.createTextNode(d.r.model)); const bar = mkEl('span', 'bar'); const f = mkEl('span'); f.style.width = Math.max(1.5, (d.x / mx) * 100) + '%'; f.style.background = vColor(d.r.vendor); bar.append(f); row.append(nm, bar, mkEl('span', 'val', fnum(d.x))); row.onclick = () => selectGpu(d.r.model); ch.append(row); });
+    if (!cd.length) ch.append(mkEl('p', 'gx-note', 'No GPU in this view has a published figure for this metric.'));
+    const lg = $('#sheet-legend'); lg.replaceChildren(); VENDORS.filter((x) => cd.some((d) => d.r.vendor === x)).forEach((x) => { const s2 = mkEl('span'); const i = mkEl('i'); i.style.background = vColor(x); s2.append(i, document.createTextNode(x)); lg.append(s2); });
+    const sk = SCOLS.some((c) => c[0] === q.gsort) ? q.gsort : null, dir = q.gdir === 'asc' ? 'asc' : 'desc';
+    let tl = list.slice(); if (sk) tl.sort((a, b) => { const tx = sk === 'model' || sk === 'arch'; const x = tx ? String(a[sk] || '').toLowerCase() : a[sk], y = tx ? String(b[sk] || '').toLowerCase() : b[sk]; if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1; return dir === 'asc' ? d3.ascending(x, y) : d3.descending(x, y); });
+    document.querySelectorAll('#sheet thead th').forEach((th) => { const b = th.querySelector('button[data-s]'); if (b) th.setAttribute('aria-sort', b.dataset.s === sk ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'); });
+    const cmp = cmpList(S.rows);
+    $('#sheet tbody').replaceChildren(...tl.map((r) => {
+      const tr = document.createElement('tr'); tr.tabIndex = 0; tr.onkeydown = (e) => { if (e.key === 'Enter' && e.target === tr) tr.click(); };
+      const c0 = document.createElement('td'); c0.className = 'cmp'; const on = cmp.includes(r.model); const cb = mkEl('button', 'gx-cmpb'); cb.type = 'button'; cb.setAttribute('aria-pressed', String(on)); cb.setAttribute('aria-label', (on ? 'Remove from compare: ' : 'Add to compare: ') + r.model); cb.append(ICON('check')); cb.onclick = (e) => { e.stopPropagation(); setCmp(on ? cmp.filter((m) => m !== r.model) : cmp.length >= 4 ? cmp : [...cmp, r.model]); }; c0.append(cb); tr.append(c0);
+      SCOLS.forEach(([key, , kind, cls]) => { const td = document.createElement('td'); td.className = [kind === 'n' ? 'n' : '', cls].filter(Boolean).join(' ');
+        if (key === 'model') { const nm = mkEl('span', 'gx-shn'); const dot = mkEl('i'); dot.style.background = vColor(r.vendor); const w = mkEl('span'); w.append(mkEl('b', null, r.model), mkEl('small', null, `${r.vendor} · ${r.seg}`)); nm.append(dot, w); td.append(nm); }
+        else if (key === 'arch') td.textContent = `${r.arch || '—'}${r.year ? ' · ' + r.year : ''}`;
+        else td.textContent = r[key] == null ? '—' : key === 'memory_gb' ? `${fnum(r[key])} GB` : key === 'mem_bw_tbs' ? `${fnum(r[key])} TB/s` : key === 'tdp_w' ? `${fInt(r[key])} W` : fnum(r[key]);
+        tr.append(td); });
+      tr.onclick = () => selectGpu(r.model); return tr; }));
   }
 
   document.querySelectorAll('#sheet th button').forEach((b) => b.addEventListener('click', () => { const q = P(); const k = b.dataset.s; set({ gsort: k, gdir: q.gsort === k && q.gdir === 'desc' ? 'asc' : q.gsort === k ? 'desc' : (['model', 'arch', 'tdp_w'].includes(k) ? 'asc' : 'desc') }); }));
+  document.querySelectorAll('#ds-views button').forEach((b) => b.addEventListener('click', () => { set({ gview: b.dataset.v === 'sheet' ? null : b.dataset.v }); }));
+  document.querySelectorAll('.gx-tabs button[data-tab=datasheet]').forEach((b) => b.addEventListener('click', () => requestAnimationFrame(() => { const y = nav.getBoundingClientRect().top + window.scrollY - 4; if (!phone.matches) window.scrollTo({ top: y, behavior: 'smooth' }); })));
   $('#sheet-q').addEventListener('input', (e) => set({ gq: e.target.value || null }));
   const render = () => {
     const core = ['providers', 'prices', 'gpu_families'].map((id) => dash.data(id).status);
