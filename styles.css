@@ -1434,7 +1434,11 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   .gx-card>.gx-note:first-child{padding:0!important}
 
   /* sideways scrollers inside a card bleed to the card edge and keep the content edge */
-  .gx-layers{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;overflow-y:hidden!important;gap:var(--m-tight)!important;margin:0 calc(-1 * var(--m-pad))!important;padding:2px var(--m-pad) 6px!important;max-width:none!important;width:auto;scrollbar-width:none;scroll-snap-type:x proximity}
+  .gx-maphead{flex-direction:column!important;flex-wrap:nowrap!important;align-items:stretch!important;gap:var(--m-in)!important;min-width:0!important}
+  .gx-maphead>*,.gx-mapttl,.gx-mapttl>*{min-width:0;max-width:100%}
+  .gx-mapttl{white-space:normal!important;overflow:visible}
+  .gx-card{min-width:0}
+  .gx-layers{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;overflow-y:hidden!important;gap:var(--m-tight)!important;margin:0 calc(-1 * var(--m-pad))!important;padding:2px var(--m-pad) 6px!important;width:calc(100% + 2 * var(--m-pad))!important;max-width:none!important;min-width:0!important;box-sizing:border-box;scroll-padding-inline:var(--m-pad);scrollbar-width:none;scroll-snap-type:x proximity}
   .gx-layers::-webkit-scrollbar{display:none}
   .gx-layers>*{flex:none}
   .gx-layers button{scroll-snap-align:start}
