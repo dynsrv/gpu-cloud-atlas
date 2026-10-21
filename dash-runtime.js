@@ -1,7 +1,7 @@
 /* Standalone stand-in for the dashboard host: loads the datasets, keeps filter state in the URL. */
 (function () {
   const DEFAULTS = { category: null, country: null, dir: 'desc', family: null, metric: 'providers', ownership: null, pgroup: 'region', q: null, region: null, sel: null, sort: 'op_mw', tab: 'overview' };
-  const SETS = ['providers', 'prices', 'gpu_families', 'countries', 'world_map', 'dc_cities', 'flags', 'logos', 'provider_details'];
+  const SETS = ['providers', 'prices', 'gpu_families', 'countries', 'world_map', 'dc_cities', 'flags', 'logos', 'provider_details', 'gpu_specs'];
   // the dashboard draws as soon as these arrive; the rest fill in after
   const CORE = ['providers', 'prices', 'gpu_families'];
   const store = {}; SETS.forEach((id) => { store[id] = { status: 'loading', data: null }; });
@@ -22,7 +22,7 @@
   };
   window.addEventListener('popstate', () => { params = readUrl(); fire(); });
   const V = (() => { try { return new URL(document.currentScript.src).searchParams.get('v') || ''; } catch (e) { return ''; } })();
-  SETS.forEach((id) => fetch('/data/' + id + '.json' + (V ? '?v=' + V : ''), { priority: CORE.includes(id) ? 'high' : id === 'provider_details' ? 'low' : 'auto' }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+  SETS.forEach((id) => fetch('/data/' + id + '.json' + (V ? '?v=' + V : ''), { priority: CORE.includes(id) ? 'high' : id === 'provider_details' || id === 'gpu_specs' ? 'low' : 'auto' }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then((d) => { store[id] = { status: 'ok', data: d }; fire(); })
     .catch(() => { store[id] = { status: 'error', data: null }; fire(); }));
 })();
