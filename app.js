@@ -901,9 +901,9 @@
   }
   const csvCell = (x) => { const t = x == null ? '' : String(x); return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
   function priceCSV(v, rows) {
-    const head = ['provider', 'hq_country', 'hq_city', 'hq_region', 'business_model', 'gpu', 'chip_maker', 'architecture', 'model_as_listed', 'pricing_terms', 'usd_per_gpu_hour', 'price_as_published', 'website'];
+    const head = ['provider', 'hq_country', 'hq_city', 'hq_region', 'business_model', 'gpu', 'chip_maker', 'architecture', 'model_as_listed', 'pricing_terms', 'usd_per_gpu_hour', 'price_usd', 'price_as_published', 'website'];
     const lines = rows.map((r) => { const p = r.p || {}; const fi = v.famInfo.get(r.family) || {};
-      return [r.provider, p.hq || r.hq, p.hq_city, p.region || r.region, p.category, r.family, r.vendor || fi.vendor, r.arch || fi.arch, r.model, r.basis, r.usd != null ? r.usd.toFixed(3) : '', r.price_text, p.website].map(csvCell).join(','); });
+      return [r.provider, p.hq || r.hq, p.hq_city, p.region || r.region, p.category, r.family, r.vendor || fi.vendor, r.arch || fi.arch, r.model, r.basis, r.usd != null ? r.usd.toFixed(3) : '', r.price_text, r.price_text_orig || '', p.website].map(csvCell).join(','); });
     return '\ufeff' + [head.join(',')].concat(lines).join('\r\n') + '\r\n';
   }
   async function saveFile(filename, text) {
@@ -981,7 +981,7 @@
       d3.select(this).selectAll('circle').data(d.a).join('circle')
         .attr('cx', (r) => x(r.usd)).attr('cy', (r, i) => cy + (((i * 7919) % 13) / 13 - 0.5) * (NR ? 14 : rowH * 0.55)).attr('r', NR ? 2.2 : 2.6)
         .attr('fill', d.k === fam ? C(0) : MUTED).attr('fill-opacity', d.k === fam ? 0.75 : 0.55)
-        .on('mousemove', (e, r) => tipShow(e, `${r.provider} · ${r.p ? r.p.hq : r.hq}`, [[trunc(String(r.model), 60), ''], ['Lowest rate', `${f$(r.usd)}/GPU-hr`], ['Pricing', r.basis || '—'], ['As published', trunc(String(r.price_text), 140)]]))
+        .on('mousemove', (e, r) => tipShow(e, `${r.provider} · ${r.p ? r.p.hq : r.hq}`, [[trunc(String(r.model), 60), ''], ['Lowest rate', `${f$(r.usd)}/GPU-hr`], ['Pricing', r.basis || '—'], ['Price (USD)', trunc(String(r.price_text), 140)], ...(r.price_text_orig ? [['As published', trunc(String(r.price_text_orig), 140)]] : [])]))
         .on('mouseleave', tipHide);
     });
     g.append('line').attr('x1', (d) => x(d.med)).attr('x2', (d) => x(d.med)).attr('y1', cy - 8).attr('y2', cy + 8).attr('stroke', 'var(--color-fg)').attr('stroke-width', 2.5).attr('stroke-linecap', 'round');
@@ -1005,7 +1005,7 @@
     tb.replaceChildren(...rows.map((r) => {
       const tr = document.createElement('tr'); tr.dataset.key = String(r.row); tr.dataset.prov = r.provider;
       const cells = [[r.provider, ''], [hqOf(r), 'hide-narrow'], [fam === ANY_GPU ? `${r.family} · ${TERM_SHORT[r.basis] || 'PAYG'}` : r.basis || '—', 'terms'], [f$(r.usd), 'n']];
-      tr.title = String(r.price_text);
+      tr.title = r.price_text_orig ? `${r.price_text}\nAs published: ${r.price_text_orig}` : String(r.price_text);
       cells.forEach(([t, c], i) => { const td = document.createElement('td'); td.textContent = t; if (c) td.className = c; if (i === 1) withFlag(td, t); if (i === 0) withLogo(td, t, 'sm'); tr.append(td); });
       return tr;
     }));
@@ -1302,11 +1302,12 @@
     if (pr.length) {
       const sec = mk('div', 'gx-pf-sec'); sec.append(mk('h4', null, `Published prices (${pr.length})`));
       const box = mk('div', 'gx-tablebox'); box.style.maxHeight = '360px';
-      const tb = mk('table', 'gx-ptable'); const th = mk('thead'); th.innerHTML = '<tr><th><span>GPU</span></th><th><span>As published</span></th><th class="n"><span>Lowest $/GPU-hr</span></th></tr>';
+      const tb = mk('table', 'gx-ptable'); const th = mk('thead'); th.innerHTML = '<tr><th><span>GPU</span></th><th><span>Price (USD)</span></th><th class="n"><span>Lowest $/GPU-hr</span></th></tr>';
       const body = mk('tbody');
       pr.forEach((r) => { const tr = mk('tr', r.usd == null ? 'np' : ''); tr.style.cursor = 'default';
         const g = mk('td'); g.append(String(r.model || r.family)); if (r.basis && r.usd != null) g.append(mk('span', 'basis', r.basis));
-        tr.append(g, mk('td', 'pt', String(r.price_text || '')), mk('td', 'n', r.usd == null ? 'not stated' : f$(r.usd))); body.append(tr); });
+        const pt = mk('td', 'pt', String(r.price_text || '')); if (r.price_text_orig) pt.title = `As published: ${r.price_text_orig}`;
+        tr.append(g, pt, mk('td', 'n', r.usd == null ? 'not stated' : f$(r.usd))); body.append(tr); });
       tb.append(th, body); box.append(tb); sec.append(box); parts.push(sec);
     }
     el.replaceChildren(...parts);
