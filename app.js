@@ -865,9 +865,12 @@
   function drawStrip(v, f) {
     const el = $('#strip'); const fam = focus();
     let groups = d3.groups(f.pricesAny.filter((r) => r.usd != null && v.famInfo.has(r.family) && (!P().vendor || v.famInfo.get(r.family).vendor === P().vendor)), (r) => r.family)
-      .filter(([k, a]) => a.length >= 3 || k === fam)
+      .filter(([k, a]) => a.length >= 3 || k === fam || ((v.famInfo.get(k) || {}).segment === 'Frontier training' && a.length >= 2))
       .map(([k, a]) => { const s = a.map((r) => r.usd).sort(d3.ascending); return { k, a, n: a.length, q1: d3.quantileSorted(s, 0.25), med: d3.quantileSorted(s, 0.5), q3: d3.quantileSorted(s, 0.75) }; })
-      .sort((a, b) => b.n - a.n).slice(0, 22).sort((a, b) => b.med - a.med);
+      .sort((a, b) => b.n - a.n)
+      // top 22 by offers, plus every flagship (frontier-training) GPU with at least 2 offers, e.g. GB200 / GB300
+      .filter((g, i) => i < 22 || g.k === fam || ((v.famInfo.get(g.k) || {}).segment === 'Frontier training' && g.n >= 2))
+      .sort((a, b) => b.med - a.med);
     if (!groups.length) { emptyNote(el, 'No priced offers match these filters.'); return; }
     const W = Math.max(300, el.clientWidth || 600); const NR = W < 560; const rowH = NR ? 46 : 26, m = { t: 26, r: NR ? 8 : 60, b: 6 }; const cy = NR ? 32 : rowH / 2;
     const H = m.t + m.b + groups.length * rowH;
