@@ -1530,3 +1530,7 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 
 .gx-shchart>.gx-shr{flex:none;height:auto}
 @media (max-width:720px){.gx-shr.gx-tokr{align-items:start}.gx-tokr .tk{white-space:normal}}
+/* vendor legends: clear space between items, small gap between swatch and name */
+#sheet-legend{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px}
+#sheet-legend span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+#sheet-legend i{flex:none;margin:0!important}
