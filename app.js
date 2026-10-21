@@ -1527,6 +1527,14 @@
   const cmpList = (rows) => String(P().cmp || '').split('|').filter(Boolean).filter((m) => rows.some((r) => r.model === m)).slice(0, 4);
   const setCmp = (arr) => set({ cmp: arr.length ? arr.join('|') : null });
   const jump = (el, off) => { if (!el) return; const y = el.getBoundingClientRect().top + window.scrollY - (off ?? 64); window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' }); };
+  let secObs = null;
+  function watchSections() {
+    if (secObs) secObs.disconnect();
+    const secs = ['gs-key', 'gs-compute', 'gs-mem', 'gs-si', 'gs-bm', 'gs-src'].map((id) => document.getElementById(id)).filter(Boolean); if (!secs.length || !window.IntersectionObserver) return;
+    const btns = [...document.querySelectorAll('.gx-sn button')];
+    secObs = new IntersectionObserver((es) => { const vis = es.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]; if (!vis) return; const i = secs.indexOf(vis.target); btns.forEach((b, j) => b.toggleAttribute('aria-current', j === i)); if (btns[i]) btns[i].setAttribute('aria-current', 'true'); }, { rootMargin: '-130px 0px -60% 0px', threshold: 0 });
+    secs.forEach((x) => secObs.observe(x));
+  }
   function selectGpu(model) { set({ gpu: model, gview: null }); requestAnimationFrame(() => requestAnimationFrame(() => jump($('#gpu-detail')))); }
 
   function drawSheet(v) {
@@ -1601,6 +1609,7 @@
     const sn = mkEl('nav', 'gx-sn'); sn.setAttribute('aria-label', 'Datasheet sections');
     [['gs-key', 'Key figures'], ['gs-compute', 'Compute'], ['gs-mem', 'Memory and links'], ['gs-si', 'Silicon and power'], ['gs-bm', 'Benchmarks'], ['gs-src', 'Notes and sources']].forEach(([id, t]) => { const a = mkEl('button', null, t); a.type = 'button'; a.onclick = () => jump(document.getElementById(id), 118); sn.append(a); });
     el.append(sn);
+    if (secObs) secObs.disconnect();
     // key figures
     const kf = mkEl('section', 'gx-gs'); kf.id = 'gs-key'; kf.append(mkEl('h3', null, 'Key figures'));
     const tiles = mkEl('div', 'gx-tiles');
@@ -1644,6 +1653,7 @@
     const sim = S.rows.filter((x) => x.model !== r.model && (x.family === r.family || (x.vendor === r.vendor && x.seg === r.seg))).slice(0, 6);
     if (sim.length) { const sm = mkEl('div', 'gx-sim'); sm.append(mkEl('span', null, 'Similar GPUs')); sim.forEach((x) => { const b = mkEl('button', null, x.model); b.type = 'button'; b.onclick = () => selectGpu(x.model); sm.append(b); }); ns.append(sm); }
     el.append(ns);
+    watchSections();
   }
 
   function drawCompare(S, rows, cmp) {
