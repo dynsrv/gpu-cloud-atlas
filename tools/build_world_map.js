@@ -1,6 +1,9 @@
 const topo=require('topojson-client'),d3=require('d3-geo'),fs=require('fs');
 const w=require('world-atlas/countries-50m.json');
-const fc=topo.feature(w,w.objects.countries);
+const simp=require('topojson-simplify');
+const MW=+process.argv[4]||0;
+let tw=w; if(MW>0){ tw=simp.presimplify(JSON.parse(JSON.stringify(w))); tw=simp.simplify(tw,MW); }
+const fc=topo.feature(tw,tw.objects.countries);
 fc.features=fc.features.filter(f=>f.properties.name!=='Antarctica');
 const W=960, N=80, Sth=-56;
 const proj=d3.geoMercator().fitWidth(W,{type:'MultiPoint',coordinates:[[-180,N],[180,N],[-180,Sth],[180,Sth]]});

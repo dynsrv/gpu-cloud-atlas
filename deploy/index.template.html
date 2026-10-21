@@ -30,10 +30,14 @@
 <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"WebSite","@id":"https://gpu.digitalstrategy.id/#website","url":"https://gpu.digitalstrategy.id/","name":"GPU Cloud Atlas","description":"Tracker of GPU cloud and AI data center providers worldwide: who offers the flagship GPUs, where their data centers are, data center capacity and GPU-hour pricing.","inLanguage":"en","creator":{"@type":"Person","name":"Wildan Aliviyarda"}},{"@type":"Dataset","name":"GPU Cloud and AI Data Center Providers Worldwide","description":"415 GPU cloud and AI data center providers with headquarters city, data center cities (360 cities in 68 countries), GPU models offered, published $/GPU-hour prices and disclosed MW capacity.","url":"https://gpu.digitalstrategy.id/","creator":{"@type":"Person","name":"Wildan Aliviyarda"},"keywords":["GPU cloud","AI data center","H100","H200","B200","GPU pricing"],"isAccessibleForFree":true,"dateModified":"2026-10-19"}]}</script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232D72D2'/%3E%3Cpath d='M9 9h14v14H9z' fill='none' stroke='white' stroke-width='2.5'/%3E%3Cpath d='M13 13h6v6h-6z' fill='white'/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="/og.jpg">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<script src="/dash-runtime.js?v=__V__"></script>
+<link rel="preload" href="/body.html?v=__V__" as="fetch" crossorigin>
+<link rel="preload" href="/app.js?v=__V__" as="script">
+<link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js" as="script" crossorigin>
+<link rel="preload" href="/fonts/google-sans.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/styles.css?v=__V__">
 <link rel="stylesheet" href="/fonts.css?v=__V__">
-<script src="/dash-runtime.js?v=__V__"></script>
 </head>
 <body>
 <div id="dash-root"><main style="font:15px/1.5 system-ui,sans-serif;color:#5F6B7C;padding:24px;max-width:760px">
@@ -43,10 +47,15 @@
 </main></div>
 <script>
 var V = '__V__';
-fetch('/body.html?v=' + V).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }).then(function (t) {
-  document.getElementById('dash-root').innerHTML = t;
-  var s = document.createElement('script'); s.src = '/app.js?v=' + V; document.body.appendChild(s);
-}).catch(function () { document.getElementById('dash-root').innerHTML = '<p style="font:14px system-ui,sans-serif;padding:24px">The dashboard could not load. Please refresh.</p>'; });
+(function () {
+  // page shell and d3 load in parallel (data is already downloading); app.js runs once both are in
+  var fail = function () { document.getElementById('dash-root').innerHTML = '<p style="font:14px system-ui,sans-serif;padding:24px">The dashboard could not load. Please refresh.</p>'; };
+  var load = function (src, cors) { return new Promise(function (ok, no) { var s = document.createElement('script'); s.src = src; if (cors) s.crossOrigin = 'anonymous'; s.onload = ok; s.onerror = no; document.head.appendChild(s); }); };
+  var body = fetch('/body.html?v=' + V).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); });
+  var d3p = load('https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js', true);
+  body.then(function (t) { document.getElementById('dash-root').innerHTML = t; return d3p; })
+    .then(function () { return load('/app.js?v=' + V); }).catch(fail);
+})();
 </script>
 </body>
 </html>

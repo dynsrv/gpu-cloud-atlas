@@ -61,7 +61,7 @@
   function flag(country) {
     const fl = dash.data('flags');
     if (fl.status === 'ok' && FLAGS.src !== fl.data) { FLAGS = new Map(fl.data.map((r) => [r.country, r.flag])); FLAGS.src = fl.data; }
-    const u = FLAGS.get(country); if (!u || !/^data:image\/svg\+xml;base64,/.test(u)) return null;
+    const u = FLAGS.get(country); if (!u || !/^data:image\/(svg\+xml|webp|png);base64,/.test(u)) return null;
     const i = document.createElement('img'); i.className = 'flag'; i.src = u; i.alt = ''; i.setAttribute('aria-hidden', 'true'); return i;
   }
   const withFlag = (el, country) => { const f = flag(country); if (f) el.prepend(f); return el; };
@@ -138,18 +138,21 @@
   function prep() {
     const pr = dash.data('providers').data, px = dash.data('prices').data, fam = dash.data('gpu_families').data;
     const dc = dash.data('dc_cities'); const cr = dc.status === 'ok' && Array.isArray(dc.data) ? dc.data : [];
-    if (cache.pr === pr && cache.px === px && cache.fam === fam && cache.cr === cr) return cache.v;
+    // long profile text lives in a separate dataset so the dashboard can draw before it arrives
+    const dt = dash.data('provider_details'); const det = dt.status === 'ok' && Array.isArray(dt.data) ? dt.data : null;
+    if (cache.pr === pr && cache.px === px && cache.fam === fam && cache.cr === cr && cache.det === det) return cache.v;
+    const detBy = det ? new Map(det.map((r) => [r.provider, r])) : null;
     const cityBy = d3.group(cr, (r) => r.provider);
     const famInfo = new Map(fam.map((f) => [f.family, { ...f, year: +f.year }]));
     const provs = pr.map((p) => ({
-      ...p, op: num(p.op_mw), pl: num(p.planned_mw), h100: num(p.h100_usd), nm: num(p.models_count),
+      ...(detBy && detBy.get(p.provider)), ...p, op: num(p.op_mw), pl: num(p.planned_mw), h100: num(p.h100_usd), nm: num(p.models_count),
       fams: String(p.families || '').split('|').filter(Boolean),
       cities: [...new Set((cityBy.get(p.provider) || []).map((r) => r.city))],
     }));
     provs.forEach((p) => { p.ncity = p.cities.length; });
     const byName = new Map(provs.map((p) => [p.provider, p]));
     const prices = px.map((r) => ({ ...r, usd: num(r.usd_hr), p: byName.get(r.provider) }));
-    cache = { pr, px, fam, cr, v: { famInfo, provs, byName, prices, cities: cr } };
+    cache = { pr, px, fam, cr, det, v: { famInfo, provs, byName, prices, cities: cr } };
     return cache.v;
   }
   // search matches the provider name, its HQ country, or any city where it runs a data center
@@ -488,7 +491,7 @@
     const cLab = [];
     g.selectAll('path').each(function (d) {
       if (!d || !agg.has(d.country) || !cxy.has(d.country)) return;
-      const bb = this.getBBox(); const area = bb.width * bb.height;
+      const bb = d.bb ? { width: d.bb[2] - d.bb[0], height: d.bb[3] - d.bb[1] } : this.getBBox(); const area = bb.width * bb.height;
       // three fixed on-screen sizes, like web maps: big countries 12px, medium 11px, small 10px
       const px = area > 4000 ? 12 : area > 700 ? 11 : 10;
       cLab.push({ t: d.country, x: cxy.get(d.country)[0], y: cxy.get(d.country)[1], px, bw: bb.width, tw: d.country.length * px * 0.56 });
@@ -862,6 +865,51 @@
   }
 
   /* ---------- pricing ---------- */
+  /* ---------- pricing CSV export ---------- */
+  // rows = every published offer that matches the filters (chip / GPU narrow to that hardware)
+  function priceRows(v, f) {
+    const q = P(); const F = famSel();
+    return f.prices.filter((r) => r.usd != null && (!F || r.family === F) && (!q.vendor || r.vendor === q.vendor))
+      .sort((a, b) => d3.ascending(a.family, b.family) || a.usd - b.usd || d3.ascending(a.provider, b.provider));
+  }
+  const csvCell = (x) => { const t = x == null ? '' : String(x); return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+  function priceCSV(v, rows) {
+    const head = ['provider', 'hq_country', 'hq_city', 'hq_region', 'business_model', 'gpu', 'chip_maker', 'architecture', 'model_as_listed', 'pricing_terms', 'usd_per_gpu_hour', 'price_as_published', 'website'];
+    const lines = rows.map((r) => { const p = r.p || {}; const fi = v.famInfo.get(r.family) || {};
+      return [r.provider, p.hq || r.hq, p.hq_city, p.region || r.region, p.category, r.family, r.vendor || fi.vendor, r.arch || fi.arch, r.model, r.basis, r.usd != null ? r.usd.toFixed(3) : '', r.price_text, p.website].map(csvCell).join(','); });
+    return '\ufeff' + [head.join(',')].concat(lines).join('\r\n') + '\r\n';
+  }
+  async function saveFile(filename, text) {
+    // inside claude.ai: the platform's download prompt; on the website: a normal browser download
+    try {
+      if (window.claude && typeof window.claude.use === 'function') {
+        const dl = await window.claude.use('downloads');
+        if (dl) { await dl.save({ filename, data: text }); return true; }
+      }
+    } catch (e) { if (e && (e.code === 'declined' || e.code === 'rate_limited')) return false; }
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a'); a.href = url; a.download = filename; a.rel = 'noopener'; document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000); return true;
+  }
+  let dlRows = [];
+  function drawDl(v, f) {
+    dlRows = priceRows(v, f);
+    const np = new Set(dlRows.map((r) => r.provider)).size; const F = famSel(); const q = P();
+    const scope = F || q.vendor || 'all GPUs';
+    const nt = $('#dl-note'); nt.replaceChildren();
+    const b1 = document.createElement('b'); b1.textContent = fInt(dlRows.length); const b2 = document.createElement('b'); b2.textContent = fInt(np);
+    nt.append(b1, ` published prices from `, b2, ` providers · ${scope}${q.region ? ' · ' + q.region : ''}${q.country ? ' · ' + q.country : ''}`);
+    $('#dl-csv').disabled = !dlRows.length;
+  }
+  $('#dl-csv').addEventListener('click', async () => {
+    const v = cache.v; if (!v || !dlRows.length) return;
+    const q = P(); const slug = (t) => String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const parts = ['gpu-prices', famSel() || q.vendor, q.region, q.country, q.category].filter(Boolean).map(slug);
+    const name = parts.join('_') + '_' + new Date().toISOString().slice(0, 10) + '.csv';
+    const btn = $('#dl-csv'); const lab = btn.querySelector('span');
+    const ok = await saveFile(name, priceCSV(v, dlRows));
+    if (ok) { btn.classList.add('done'); lab.textContent = 'Downloaded'; setTimeout(() => { btn.classList.remove('done'); lab.textContent = 'Download CSV'; }, 1800); }
+  });
   function drawStrip(v, f) {
     const el = $('#strip'); const fam = focus();
     let groups = d3.groups(f.pricesAny.filter((r) => r.usd != null && v.famInfo.has(r.family) && (!P().vendor || v.famInfo.get(r.family).vendor === P().vendor)), (r) => r.family)
@@ -1392,7 +1440,7 @@
     document.querySelectorAll('.gx-tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
     TABS.forEach((id) => { document.getElementById(id).hidden = id !== tab; });
     if (tab === 'overview') { drawMap(v, f); drawExplorer(v, f); drawFocus(v); insOverview(v, f); }
-    if (tab === 'pricing') { drawStrip(v, f); drawCheap(f); drawPGroup(f); insPricing(f); }
+    if (tab === 'pricing') { drawDl(v, f); drawStrip(v, f); drawCheap(f); drawPGroup(f); insPricing(f); }
     if (tab === 'capacity') { drawMW(f); drawOwn(f); drawMWC(f); insCapacity(f); }
     if (tab === 'hardware') { drawAvail(v, f); drawGen(v, f); drawHeat(v, f); insHardware(v, f); }
     if (tab === 'directory') { drawDir(f); drawDetail(v); }

@@ -20,6 +20,7 @@
 <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M2.5 12h2M19.5 12h2M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></symbol>
 <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5"/></symbol>
 <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3.5v11.5M7 10.5l5 5 5-5M4.5 19.5h15"/></symbol>
 <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
 <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16z"/></symbol>
 <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V4M4 20h16M8 16v-5M12 16V8M16 16v-3M20 16V6"/></symbol>
@@ -119,6 +120,7 @@
   <!-- 02 Pricing -->
   <section class="gx-panel" id="pricing" role="tabpanel" aria-labelledby="tab-pricing" hidden>
     <div class="gx-intro"><span class="gx-ib"><svg class="i" aria-hidden="true"><use href="#i-tag"/></svg></span><h2>What a GPU-hour costs</h2><p>Every published offer, converted to US dollars per GPU-hour at the lowest rate it lists (spot, reserved or on-demand). "Contact sales" quotes are left out.</p></div>
+    <div class="gx-dlbar"><span class="gx-note" id="dl-note"></span><button type="button" class="gx-btn gx-dl" id="dl-csv"><svg class="i" aria-hidden="true"><use href="#i-download"/></svg><span>Download CSV</span></button></div>
     <div class="gx-ins" id="ins-pricing" data-source="prices providers"></div>
     <div class="gx-card" id="price-range-card">
       <div class="gx-ch"><div><h3>Price range by GPU</h3><p class="gx-note">Each dot is one offer. The bar spans the middle half, the dark tick is the median. Log scale. Click a GPU to focus on it.</p></div></div>

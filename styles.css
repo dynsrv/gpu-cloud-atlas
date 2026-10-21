@@ -928,3 +928,14 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   .gx-filters.open #f-reset.is-active{background:color-mix(in srgb,var(--gx-gblue) 12%,var(--color-panel))!important;color:var(--gx-gblue)!important;border-color:color-mix(in srgb,var(--gx-gblue) 40%,transparent)!important;box-shadow:0 -14px 0 4px var(--color-panel)!important}
   .gx-scrim:not([hidden]){-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);background:rgba(15,23,42,.45)!important;animation:gx-fade .2s ease-out}
 }
+
+/* pricing: CSV download */
+.gx-dlbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 12px 10px 16px;border:1px solid var(--gx-line);border-radius:var(--r-md);background:var(--color-panel)}
+.gx-dlbar .gx-note{margin:0}
+.gx-dlbar .gx-note b{color:var(--color-fg)}
+.gx-dl{gap:8px;min-height:40px!important;border-radius:999px!important;padding:0 16px!important;font-weight:600;border-color:color-mix(in srgb,var(--gx-gblue) 45%,var(--gx-line))!important;background:color-mix(in srgb,var(--gx-gblue) 9%,var(--color-panel))!important;color:var(--gx-gblue)!important}
+.gx-dl:hover{background:var(--gx-gblue)!important;color:var(--gx-gblue-ink)!important}
+.gx-dl .i{width:16px;height:16px}
+.gx-dl[disabled]{opacity:.5;pointer-events:none}
+.gx-dl.done{background:var(--color-ok,#238551)!important;border-color:transparent!important;color:#fff!important}
+@media (max-width:720px){.gx-dlbar{padding:10px 12px}.gx-dl{flex:1 1 100%;justify-content:center}}
