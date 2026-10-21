@@ -1524,3 +1524,6 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .gx-how ul{list-style:disc outside!important;padding-left:20px!important}
 .gx-how li{display:list-item!important;list-style:disc outside!important;padding-left:2px}
 .gx-how li::marker{color:var(--gx-gblue)}
+/* rankings table: numeric columns centred, header and values on the same axis */
+#sheet th.n,#sheet td.n{text-align:center!important}
+#sheet th.n button,#sheet th.n>*{margin-inline:auto;justify-content:center!important;text-align:center!important}
