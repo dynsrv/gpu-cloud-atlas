@@ -1509,7 +1509,10 @@
   function sheetRows(v) {
     const d = dash.data('gpu_specs'); if (d.status !== 'ok' || !Array.isArray(d.data)) return null;
     if (sheetCache && sheetCache.src === d.data && sheetCache.fi === v.famInfo) return sheetCache;
-    const rows = d.data.map((r) => { const fi = v.famInfo.get(r.family) || {}; return { ...r, seg: fi.segment || r.segment || 'Other', vendor: r.vendor || fi.vendor, arch: r.arch || fi.arch, year: r.release_year || fi.year }; });
+    const NUMK = ['release_year', 'transistors_b', 'memory_gb', 'mem_bw_tbs', 'fp64_tflops', 'fp32_tflops', 'tf32_tflops', 'bf16_tflops', 'fp8_tflops', 'fp4_tflops', 'int8_tops', 'tdp_w', 'scale_up_gbs'];
+    const toArr = (x) => { if (Array.isArray(x)) return x; if (typeof x === 'string' && x.trim()) { try { const j = JSON.parse(x); return Array.isArray(j) ? j : []; } catch (_) { return []; } } return []; };
+    const clean = (r) => { const o = { ...r }; NUMK.forEach((k) => { const x = o[k]; o[k] = x == null || x === '' ? null : Number.isFinite(+x) ? +x : null; }); ['best_for', 'benchmarks', 'sources'].forEach((k) => { o[k] = toArr(o[k]); }); o.bf16_is_fp16 = o.bf16_is_fp16 === true || o.bf16_is_fp16 === 'true'; ['memory_type', 'scale_up', 'host_interface', 'multi_instance', 'process_node', 'die_note', 'form_factor', 'summary', 'notes', 'variants_note', 'full_name'].forEach((k) => { if (o[k] === '') o[k] = null; }); return o; };
+    const rows = d.data.map((r0) => { const r = clean(r0); const fi = v.famInfo.get(r.family) || {}; return { ...r, seg: fi.segment || r.segment || 'Other', vendor: r.vendor || fi.vendor, arch: r.arch || fi.arch, year: r.release_year || fi.year }; });
     const keys = [...PREC.map((p) => p[0]), 'memory_gb', 'mem_bw_tbs', 'tdp_w', 'eff', 'int']; const stat = {};
     keys.forEach((k) => { const vals = rows.map((r) => gv(r, k)).filter((x) => x != null).sort((a, b) => b - a); stat[k] = { max: vals[0] || 1, vals }; });
     sheetCache = { src: d.data, fi: v.famInfo, rows, stat }; return sheetCache;
