@@ -152,7 +152,9 @@
     provs.forEach((p) => { p.ncity = p.cities.length; });
     const byName = new Map(provs.map((p) => [p.provider, p]));
     const prices = px.map((r) => ({ ...r, usd: num(r.usd_hr), p: byName.get(r.provider) }));
-    cache = { pr, px, fam, cr, det, v: { famInfo, provs, byName, prices, cities: cr } };
+    // pricing models each provider publishes (only priced offers count)
+    const basisBy = new Map(); prices.forEach((r) => { if (r.usd == null || !r.basis) return; (basisBy.get(r.provider) || basisBy.set(r.provider, new Set()).get(r.provider)).add(r.basis); });
+    cache = { pr, px, fam, cr, det, v: { famInfo, provs, byName, prices, cities: cr, basisBy } };
     return cache.v;
   }
   // search matches the provider name, its HQ country, or any city where it runs a data center
@@ -165,7 +167,7 @@
   // GPU models a provider lists, newest first
   const gpusOf = (p) => { const fi = (cache.v || {}).famInfo; if (!fi) return p.fams; return p.fams.filter((k) => fi.has(k)).sort((a, b) => (fi.get(b).year - fi.get(a).year) || d3.ascending(a, b)); };
   const chipName = () => famSel() || P().vendor || '';
-  const sells = (v, p) => { const q = P(); const F = famSel(); return (!F || p.fams.includes(F)) && (!q.vendor || p.fams.some((k) => (v.famInfo.get(k) || {}).vendor === q.vendor)); };
+  const sells = (v, p) => { const q = P(); const F = famSel(); return (!q.pm || ((v.basisBy && v.basisBy.get(p.provider)) || new Set()).has(q.pm)) && (!F || p.fams.includes(F)) && (!q.vendor || p.fams.some((k) => (v.famInfo.get(k) || {}).vendor === q.vendor)); };
   function filt(v) {
     const q = P(); const s = String(q.q || '').toLowerCase();
     const base = (p) => (!q.region || p.region === q.region) && (!q.category || p.category === q.category) &&
@@ -177,7 +179,8 @@
     // for data center cities, region/country/city describe where the city is, not the provider's HQ
     const provsLoc = v.provs.filter((p) => sells(v, p) && (!q.category || p.category === q.category) && (!q.ownership || p.ownership === q.ownership) && (!s || match(p, s)));
     const SA = new Set(provsAny);
-    return { provs, provsAny, provsLoc, prices: v.prices.filter((r) => r.p && S.has(r.p)), pricesAny: v.prices.filter((r) => r.p && SA.has(r.p)) };
+    const pmOk = (r) => !q.pm || r.basis === q.pm;
+    return { provs, provsAny, provsLoc, prices: v.prices.filter((r) => r.p && S.has(r.p) && pmOk(r)), pricesAny: v.prices.filter((r) => r.p && SA.has(r.p) && pmOk(r)) };
   }
   function provMin(prices, fam) {
     const m = new Map();
@@ -239,7 +242,7 @@
   }
 
   /* ---------- filters ---------- */
-  const sel = { vendor: $('#f-vendor'), family: $('#f-family'), region: $('#f-region'), country: $('#f-country'), category: $('#f-category'), ownership: $('#f-ownership') };
+  const sel = { vendor: $('#f-vendor'), family: $('#f-family'), region: $('#f-region'), country: $('#f-country'), category: $('#f-category'), ownership: $('#f-ownership'), pm: $('#f-pm') };
   Object.entries(sel).forEach(([k, el]) => el.addEventListener('change', () => set(k === 'region' ? { region: el.value || null, country: null } : k === 'vendor' ? vendorChange(el.value || null) : { [k]: el.value && el.value !== '__all' ? el.value : null })));
   const qIn = $('#f-q'); let qT;
   qIn.addEventListener('input', () => { clearTimeout(qT); qT = setTimeout(() => set({ q: qIn.value.trim() || null }), 220); });
@@ -282,8 +285,11 @@
     qIn.closest('.gx-f').classList.toggle('is-set', !!q.q);
     fillSelect(sel.category, uniq('category').map((r) => [r, r]), q.category, 'All models');
     fillSelect(sel.ownership, OWN.map((o) => [o[0], o[1]]), q.ownership, 'Any ownership');
+    const pmN = new Map(); v.basisBy.forEach((bs) => bs.forEach((b) => pmN.set(b, (pmN.get(b) || 0) + 1)));
+    const PM_ORDER = ['On-demand (PAYG)', 'Commitment', 'Spot / interruptible', 'Serverless'];
+    fillSelect(sel.pm, [...pmN.keys()].sort((a, b) => ((PM_ORDER.indexOf(a) + 9) % 9) - ((PM_ORDER.indexOf(b) + 9) % 9)).map((b) => [b, `${b} (${pmN.get(b)})`]), q.pm, 'Any');
     if (qIn !== document.activeElement) qIn.value = q.q || '';
-    const nSet = ['vendor', 'region', 'country', 'category', 'ownership', 'city'].filter((k) => q[k]).length + (famSel() ? 1 : 0);
+    const nSet = ['vendor', 'region', 'country', 'category', 'ownership', 'pm', 'city'].filter((k) => q[k]).length + (famSel() ? 1 : 0);
     const rb = $('#f-reset'); rb.classList.toggle('is-active', nSet > 0 || !!q.q); rb.querySelector('span').textContent = nSet ? `Reset (${nSet})` : 'Reset';
     const fc = $('#f-count'); fc.hidden = !nSet; fc.textContent = String(nSet); $('#f-toggle').setAttribute('aria-label', nSet ? `Filters, ${nSet} active` : 'Filters');
     const chips = $('#f-chips'); const list = [];
@@ -305,6 +311,7 @@
     if (q.city) items.push([q.city, 'City', { city: null }]);
     if (q.category) items.push([q.category, 'Model', { category: null }]);
     if (q.ownership) items.push([pick('#f-ownership'), 'DC', { ownership: null }]);
+    if (q.pm) items.push([pick('#f-pm'), 'Pricing', { pm: null }]);
     if (q.q) items.push([`"${q.q}"`, 'Search', { q: null }]);
     const tab = tabOf();
     if (!items.length) { if (tab === 'overview') { const n = document.createElement('span'); n.className = 'fs-note'; n.textContent = `All ${fInt(f.provs.length)} providers`; box.replaceChildren(n); } else box.replaceChildren(); }
@@ -896,15 +903,14 @@
     dlRows = priceRows(v, f);
     const np = new Set(dlRows.map((r) => r.provider)).size; const F = famSel(); const q = P();
     const scope = F || q.vendor || 'all GPUs';
-    const nt = $('#dl-note'); nt.replaceChildren();
-    const b1 = document.createElement('b'); b1.textContent = fInt(dlRows.length); const b2 = document.createElement('b'); b2.textContent = fInt(np);
-    nt.append(b1, ` published prices from `, b2, ` providers · ${scope}${q.region ? ' · ' + q.region : ''}${q.country ? ' · ' + q.country : ''}`);
+    $('#dl-n').textContent = fInt(dlRows.length);
+    $('#dl-csv').title = `Download ${fInt(dlRows.length)} published prices from ${fInt(np)} providers (${scope}${q.pm ? ', ' + q.pm : ''}${q.region ? ', ' + q.region : ''}${q.country ? ', ' + q.country : ''}) as CSV`;
     $('#dl-csv').disabled = !dlRows.length;
   }
   $('#dl-csv').addEventListener('click', async () => {
     const v = cache.v; if (!v || !dlRows.length) return;
     const q = P(); const slug = (t) => String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const parts = ['gpu-prices', famSel() || q.vendor, q.region, q.country, q.category].filter(Boolean).map(slug);
+    const parts = ['gpu-prices', famSel() || q.vendor, q.pm, q.region, q.country, q.category].filter(Boolean).map(slug);
     const name = parts.join('_') + '_' + new Date().toISOString().slice(0, 10) + '.csv';
     const btn = $('#dl-csv'); const lab = btn.querySelector('span');
     const ok = await saveFile(name, priceCSV(v, dlRows));
@@ -963,19 +969,32 @@
     if (NR) g.filter((d, i) => i < groups.length - 1).append('line').attr('x1', 8).attr('x2', W - 8).attr('y1', rowH - 0.5).attr('y2', rowH - 0.5).attr('stroke', 'var(--cds-chart-grid)');
     el.classList.add('drawn');
   }
+  // providers by price: every provider's lowest rate for the focus GPU; sortable by any column
   function drawCheap(f) {
-    const fam = focus(); $('#cheap-title').textContent = fam === ANY_GPU ? 'Cheapest offers, any GPU' : `Cheapest ${fam} offers`;
-    const rows = provMin(f.prices, fam).sort((a, b) => a.usd - b.usd).slice(0, 20);
+    const fam = focus(); const q = P(); const k = ['provider', 'hq', 'basis', 'usd'].includes(q.csort) ? q.csort : 'usd'; const dir = q.cdir === 'desc' ? 'desc' : 'asc';
+    const rows = provMin(f.prices, fam);
+    const hqOf = (r) => (r.p ? r.p.hq : r.hq) || '';
+    const key = { provider: (r) => r.provider.toLowerCase(), hq: (r) => hqOf(r).toLowerCase(), basis: (r) => (fam === ANY_GPU ? r.family : r.basis || '').toLowerCase(), usd: (r) => r.usd }[k];
+    rows.sort((a, b) => { const x = key(a), y = key(b); const c = x < y ? -1 : x > y ? 1 : 0; return (dir === 'asc' ? c : -c) || a.usd - b.usd; });
+    $('#cheap-title').textContent = fam === ANY_GPU ? 'Providers by price, any GPU' : `${fam} providers by price`;
+    $('#cheap-sub').textContent = `${fInt(rows.length)} providers · each one's lowest published ${fam === ANY_GPU ? '' : fam + ' '}rate per GPU-hour${q.pm ? ' (' + q.pm + ')' : ''} and its pricing model. Click a column to sort, a row for the profile.`;
+    document.querySelectorAll('#cheap th').forEach((th) => { const b = th.querySelector('button'); th.setAttribute('aria-sort', b && b.dataset.c === k ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'); });
+    document.querySelectorAll('#cheap-dir button').forEach((b) => b.setAttribute('aria-pressed', String(k === 'usd' && b.dataset.d === dir)));
     const tb = $('#cheap tbody');
     if (!rows.length) { const tr = document.createElement('tr'); const td = document.createElement('td'); td.colSpan = 4; td.textContent = `No published ${fam} prices for these filters.`; tr.append(td); tb.replaceChildren(tr); return; }
     tb.replaceChildren(...rows.map((r) => {
       const tr = document.createElement('tr'); tr.dataset.key = String(r.row); tr.dataset.prov = r.provider;
-      const cells = [[r.provider, ''], [r.p ? r.p.hq : r.hq, 'hide-narrow'], [fam === ANY_GPU ? `${r.family} · ${TERM_SHORT[r.basis] || 'PAYG'}` : r.basis || '—', 'terms'], [f$(r.usd), 'n']];
+      const cells = [[r.provider, ''], [hqOf(r), 'hide-narrow'], [fam === ANY_GPU ? `${r.family} · ${TERM_SHORT[r.basis] || 'PAYG'}` : r.basis || '—', 'terms'], [f$(r.usd), 'n']];
       tr.title = String(r.price_text);
       cells.forEach(([t, c], i) => { const td = document.createElement('td'); td.textContent = t; if (c) td.className = c; if (i === 1) withFlag(td, t); if (i === 0) withLogo(td, t, 'sm'); tr.append(td); });
       return tr;
     }));
   }
+  document.querySelectorAll('#cheap th button').forEach((b) => b.addEventListener('click', () => {
+    const q = P(); const c = b.dataset.c; const cur = ['provider', 'hq', 'basis', 'usd'].includes(q.csort) ? q.csort : 'usd';
+    set({ csort: c, cdir: cur === c ? (q.cdir === 'desc' ? 'asc' : 'desc') : 'asc' });
+  }));
+  document.querySelectorAll('#cheap-dir button').forEach((b) => b.addEventListener('click', () => set({ csort: 'usd', cdir: b.dataset.d })));
   function drawPGroup(f) {
     const el = $('#pgroup'); const fam = focus(); const k = P().pgroup || 'region';
     $('#pg-title').textContent = `Median ${fam} rate by group`;

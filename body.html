@@ -63,9 +63,10 @@
       <label class="gx-f"><span><svg class="i" aria-hidden="true"><use href="#i-pin"/></svg>Country</span><select id="f-country" aria-label="HQ country"></select></label>
       <label class="gx-f"><span><svg class="i" aria-hidden="true"><use href="#i-brief"/></svg>Business model</span><select id="f-category" aria-label="Business model"></select></label>
       <label class="gx-f"><span><svg class="i" aria-hidden="true"><use href="#i-server"/></svg>Data centers</span><select id="f-ownership" aria-label="Data center ownership"></select></label>
+      <label class="gx-f"><span><svg class="i" aria-hidden="true"><use href="#i-tag"/></svg>Pricing model</span><select id="f-pm" aria-label="Pricing model"></select></label>
       <label class="gx-f gx-search"><svg class="i gx-sic" aria-hidden="true"><use href="#i-search"/></svg><input id="f-q" type="search" placeholder="Search providers" autocomplete="off" aria-label="Search provider"></label>
-      <button class="gx-btn" id="f-reset" type="button"><svg class="i" aria-hidden="true"><use href="#i-reset"/></svg><span>Reset</span></button>
-      <button class="gx-btn gx-done" id="f-done" type="button">Show results</button>
+      <div class="gx-ffoot"><button class="gx-btn" id="f-reset" type="button"><svg class="i" aria-hidden="true"><use href="#i-reset"/></svg><span>Reset</span></button>
+      <button class="gx-btn gx-done" id="f-done" type="button">Show results</button></div>
       <span id="f-chips" style="display:contents"></span>
     </div>
   </div>
@@ -120,18 +121,18 @@
   <!-- 02 Pricing -->
   <section class="gx-panel" id="pricing" role="tabpanel" aria-labelledby="tab-pricing" hidden>
     <div class="gx-intro"><span class="gx-ib"><svg class="i" aria-hidden="true"><use href="#i-tag"/></svg></span><h2>What a GPU-hour costs</h2><p>Every published offer, converted to US dollars per GPU-hour at the lowest rate it lists (spot, reserved or on-demand). "Contact sales" quotes are left out.</p></div>
-    <div class="gx-dlbar"><span class="gx-note" id="dl-note"></span><button type="button" class="gx-btn gx-dl" id="dl-csv"><svg class="i" aria-hidden="true"><use href="#i-download"/></svg><span>Download CSV</span></button></div>
     <div class="gx-ins" id="ins-pricing" data-source="prices providers"></div>
     <div class="gx-card" id="price-range-card">
-      <div class="gx-ch"><div><h3>Price range by GPU</h3><p class="gx-note">Each dot is one offer. The bar spans the middle half, the dark tick is the median. Log scale. Click a GPU to focus on it.</p></div></div>
+      <div class="gx-ch"><div><h3>Price range by GPU</h3><p class="gx-note">Each dot is one offer. The bar spans the middle half, the dark tick is the median. Log scale. Click a GPU to focus on it.</p></div><button type="button" class="gx-btn gx-dl" id="dl-csv"><svg class="i" aria-hidden="true"><use href="#i-download"/></svg><span>Download CSV</span><small id="dl-n"></small></button></div>
       <div class="gx-chart" id="strip" data-source="prices"></div>
     </div>
     <div class="gx-grid">
       <div class="gx-card" id="cheapest-card">
-        <div><h3 id="cheap-title">Cheapest offers</h3><p class="gx-note">Lowest published rate per provider for the focus GPU, with its pricing terms (PAYG on-demand, commitment, spot or serverless). Click a row for the profile.</p></div>
+        <div class="gx-ch"><div><h3 id="cheap-title">Providers by price</h3><p class="gx-note" id="cheap-sub">Each provider's lowest published rate per GPU-hour and its pricing model.</p></div>
+          <div class="gx-seg gx-psort" id="cheap-dir" role="group" aria-label="Sort by price"><button type="button" data-d="asc">Lowest first</button><button type="button" data-d="desc">Highest first</button></div></div>
         <div class="gx-tablebox" style="max-height:440px">
           <table id="cheap" data-source="prices logos" data-row-key="row">
-            <thead><tr><th data-field="provider"><span>Provider</span></th><th data-field="hq" class="hide-narrow"><span>HQ</span></th><th data-field="basis"><span>Pricing</span></th><th data-field="usd_hr" class="n"><span>$/GPU-hr</span></th></tr></thead>
+            <thead><tr><th data-field="provider"><button type="button" data-c="provider">Provider</button></th><th data-field="hq" class="hide-narrow"><button type="button" data-c="hq">HQ</button></th><th data-field="basis"><button type="button" data-c="basis">Pricing model</button></th><th data-field="usd_hr" class="n"><button type="button" data-c="usd">$/GPU-hr</button></th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
