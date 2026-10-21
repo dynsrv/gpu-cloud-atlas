@@ -22,7 +22,22 @@
   };
   window.addEventListener('popstate', () => { params = readUrl(); fire(); });
   const V = (() => { try { return new URL(document.currentScript.src).searchParams.get('v') || ''; } catch (e) { return ''; } })();
-  SETS.forEach((id) => fetch('/data/' + id + '.json' + (V ? '?v=' + V : ''), { priority: CORE.includes(id) ? 'high' : id === 'provider_details' || id === 'gpu_specs' ? 'low' : 'auto' }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then((d) => { store[id] = { status: 'ok', data: d }; fire(); })
-    .catch(() => { store[id] = { status: 'error', data: null }; fire(); }));
+  // per-dataset cache keys (content hashes injected into index.html), so a deploy only re-downloads the files that changed
+  const DV = window.__DV || {};
+  const url = (id) => '/data/' + id + '.json' + (DV[id] || V ? '?v=' + (DV[id] || V) : '');
+  const settled = {};
+  const load = (id, pri) => fetch(url(id), { priority: pri }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then((d) => { store[id] = { status: 'ok', data: d }; }).catch(() => { store[id] = { status: 'error', data: null }; })
+    .then(() => { settled[id] = true; });
+  // 1) everything the first screen draws: fetched together, rendered once (no half-drawn map, no second full render)
+  const q0 = readUrl();
+  const FIRST = ['providers', 'prices', 'gpu_families', 'countries', 'world_map', 'dc_cities']
+    .concat(q0.tab === 'datasheet' ? ['gpu_specs'] : [], q0.sel || q0.tab === 'directory' ? ['provider_details', 'flags', 'logos'] : []);
+  const LATE = SETS.filter((id) => !FIRST.includes(id));
+  Promise.all(FIRST.map((id) => load(id, CORE.includes(id) ? 'high' : 'auto'))).then(() => {
+    fire();
+    // 2) the rest (logos, long profiles, datasheet) after the first paint, batched into one more render
+    const go = () => Promise.all(LATE.map((id) => load(id, 'low'))).then(() => fire());
+    (window.requestIdleCallback || ((f) => setTimeout(f, 200)))(go, { timeout: 1500 });
+  });
 })();

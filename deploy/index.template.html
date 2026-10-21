@@ -31,13 +31,14 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232D72D2'/%3E%3Cpath d='M9 9h14v14H9z' fill='none' stroke='white' stroke-width='2.5'/%3E%3Cpath d='M13 13h6v6h-6z' fill='white'/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="/og.jpg">
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-<script src="/dash-runtime.js?v=__V__"></script>
+<script>window.__DV=__DV__;</script>
+<script src="/dash-runtime.min.js?v=__V__"></script>
 <link rel="preload" href="/body.html?v=__V__" as="fetch" crossorigin>
-<link rel="preload" href="/app.js?v=__V__" as="script">
+<link rel="preload" href="/app.min.js?v=__V__" as="script">
 <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js" as="script" crossorigin>
 <link rel="preload" href="/fonts/google-sans.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/styles.css?v=__V__">
-<link rel="stylesheet" href="/fonts.css?v=__V__">
+<style>@font-face{font-family:"GX Google Sans";font-style:normal;font-weight:400 700;font-display:swap;src:url("/fonts/google-sans.woff2") format("woff2")}@font-face{font-family:"GX Geist Mono";font-style:normal;font-weight:100 900;font-display:swap;src:url("/fonts/geist-mono.woff2") format("woff2")}</style>
+<link rel="stylesheet" href="/styles.min.css?v=__V__">
 </head>
 <body>
 <div id="dash-root"><main style="font:15px/1.5 system-ui,sans-serif;color:#5F6B7C;padding:24px;max-width:760px">
@@ -54,7 +55,7 @@ var V = '__V__';
   var body = fetch('/body.html?v=' + V).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); });
   var d3p = load('https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js', true);
   body.then(function (t) { document.getElementById('dash-root').innerHTML = t; return d3p; })
-    .then(function () { return load('/app.js?v=' + V); }).catch(fail);
+    .then(function () { return load('/app.min.js?v=' + V); }).catch(fail);
 })();
 </script>
 </body>

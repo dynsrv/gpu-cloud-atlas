@@ -536,10 +536,10 @@
     const lab = g.append('g').attr('pointer-events', 'none').selectAll('text').data(showCities ? pts.slice(0, pv ? 40 : m === 'cities' || chip || q.country ? 14 : 0) : []).join('text')
       .attr('class', 'citylab').attr('dominant-baseline', 'central').text((d) => d.city);
     const paint = (k) => {
+      const s = (el.clientWidth || W) / W; // screen pixels per map unit (read before any write)
       dots.attr('r', (d) => rr(d) / Math.sqrt(k)).attr('stroke-width', (d) => (isOn(d) ? 2 : 1) / k);
       hqDots.attr('r', (d) => hqR(d) / Math.sqrt(k)).attr('stroke-width', 1.2 / k);
       halo.selectAll('circle').attr('r', (d) => (rr(d) * 2.1) / Math.sqrt(k));
-      const s = (el.clientWidth || W) / W; // screen pixels per map unit
       // place names biggest-first and skip any that would overlap a name already placed
       const placed = [];
       const boxOf = (x, y, w, hgt) => [x - w / 2, y - hgt / 2, x + w / 2, y + hgt / 2];
@@ -1869,7 +1869,7 @@
     if (tab === 'hardware') { drawAvail(v, f); drawGen(v, f); drawHeat(v, f); insHardware(v, f); }
     if (tab === 'directory') { drawDir(f); drawDetail(v); }
     if (tab === 'datasheet') drawSheet(v);
-    ddSyncAll(); fEdge();
+    ddSyncAll(); requestAnimationFrame(fEdge);
     if (!jumped) { jumped = true; const h = location.hash.slice(1); if (TABS.includes(h) && h !== tab) set({ tab: h }); }
   };
   $('#empty-reset').addEventListener('click', () => $('#f-reset').click());

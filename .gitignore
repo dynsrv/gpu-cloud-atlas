@@ -1,2 +1,4 @@
 node_modules
 .DS_Store
+deploy/out/
+node_modules/
