@@ -1058,7 +1058,7 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 
 /* ===== Calm pass: neutral by default, blue only for actions and the selected state ===== */
 .gx{--gx-soft:color-mix(in srgb,var(--color-fg) 5%,transparent);--gx-ink-2:color-mix(in srgb,var(--color-fg) 62%,var(--color-bg))}
-@media (min-width:721px){.gx{gap:44px!important}}
+@media (min-width:721px){.gx{gap:22px!important}}
 /* hero: quiet, no coloured rule, lighter title */
 .gx-hero{border-top:1px solid var(--color-border-line)!important;box-shadow:0 1px 2px rgba(16,24,40,.04)!important}
 .gx-hero .gx-eyebrow,.gx-eyebrow{color:var(--color-fg-muted)!important;font-weight:500;letter-spacing:.01em}
@@ -1104,7 +1104,7 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .gx-kpi .kic .i{width:24px!important;height:24px!important}
 @media (max-width:720px){.gx-kpi .kic{top:12px!important;right:12px!important}.gx-kpi .kic .i{width:20px!important;height:20px!important}}
 /* ===== Quick views ===== */
-.gx-quick{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-22px 0 -16px}
+.gx-quick{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-8px 0 -4px}
 .gx-quick .ql{font-size:13px;font-weight:500;color:var(--color-fg-muted);margin-right:2px}
 .gx-quick button{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border:1px solid var(--color-border-line);border-radius:var(--r-sm);background:var(--color-panel);color:var(--color-fg);font:500 13px var(--gx-sans);transition:border-color .15s,background .15s,color .15s}
 .gx-quick button .i{width:14px;height:14px;color:var(--color-fg-muted)}
