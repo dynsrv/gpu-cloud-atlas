@@ -1518,3 +1518,6 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .gx-tokpane[hidden]{display:none}
 .gx-tokctl{align-items:center}
 .gx-tokctl .gx-est{margin:0}
+/* rankings view: same gap between cards as every other page (20px desktop, 16px phones) */
+#sv-rank:not([hidden]){display:flex;flex-direction:column;gap:20px}
+@media (max-width:720px){#sv-rank:not([hidden]){gap:16px}}
