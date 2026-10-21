@@ -1705,36 +1705,74 @@
   // ---- synthetic tokens/s: roofline estimate of LLM decode speed per GPU ----
   const TOK_CTX = 2048;
   const LLMS = [
-    { id: 'l8', name: 'Llama 3.1 8B', short: '8B dense', params: 8.03, active: 8.03, kv: 131072, moe: null,
+    { id: 'l8', name: 'Llama 3.1 8B', short: '8B dense', params: 8.03, active: 8.03, kv: 131072, layers: 32, dAttn: 4096, moe: null,
       cand: [['BF16', 2.0, 'bf16']] },
-    { id: 'l70', name: 'Llama 3.3 70B', short: '70B dense', params: 70.6, active: 70.6, kv: 327680, moe: null,
+    { id: 'l70', name: 'Llama 3.3 70B', short: '70B dense', params: 70.6, active: 70.6, kv: 327680, layers: 80, dAttn: 8192, moe: null,
       cand: [['8-bit', 1.0, 'fp8|bf16']] },
-    { id: 'oss', name: 'gpt-oss-120b', short: '117B MoE, 5.1B active', params: 116.8, active: 5.1, kv: 40960,
+    { id: 'oss', name: 'gpt-oss-120b', short: '117B MoE, 5.1B active', params: 116.8, active: 5.1, kv: 40960, layers: 36, dAttn: 4096 * 0.55,
       moe: { fixedGB: 2.5, expertGB: 62.5, experts: 128, topk: 4 }, cand: [['MXFP4', null, 'fp8|bf16', 65]] },
   ];
-  const TOK_LOADS = [[1, '1 user'], [32, '32 users']];
-  function tokEstimate(r, m, B) {
+  const TOK_LOADS = [[1, '1 user'], [32, '32 users'], ['pf', 'Prompt reading']];
+  // How well each architecture and its software stack turns datasheet peaks into real decode speed.
+  // mem = share of peak HBM bandwidth reached, cmp = share of peak tensor throughput, lat = fixed cost per layer per step (µs:
+  // kernel launches, synchronisation, small ops). Judgement calls based on public serving benchmarks; see "How this is estimated".
+  const TOK_PROF = [
+    [(r) => /Blackwell/.test(r.arch) && !/PCIe/.test(r.form_factor || ''), 'NVIDIA Blackwell data center', 0.82, 0.55, 8],
+    [(r) => /Blackwell/.test(r.arch), 'NVIDIA Blackwell card', 0.78, 0.50, 10],
+    [(r) => r.arch === 'Hopper', 'NVIDIA Hopper', 0.78, 0.50, 10],
+    [(r) => r.arch === 'Ada Lovelace', 'NVIDIA Ada', 0.74, 0.45, 12],
+    [(r) => r.arch === 'Ampere', 'NVIDIA Ampere', 0.70, 0.45, 14],
+    [(r) => r.vendor === 'NVIDIA', 'NVIDIA Volta/Turing/Pascal', 0.60, 0.35, 22],
+    [(r) => r.arch === 'CDNA 4', 'AMD CDNA 4 (ROCm)', 0.68, 0.45, 12],
+    [(r) => r.arch === 'CDNA 3', 'AMD CDNA 3 (ROCm)', 0.64, 0.42, 14],
+    [(r) => r.vendor === 'AMD', 'AMD CDNA 2', 0.55, 0.35, 22],
+    [(r) => r.vendor === 'Google', 'Google TPU (JAX/XLA)', 0.72, 0.55, 10],
+    [(r) => r.vendor === 'Intel', 'Intel Gaudi', 0.62, 0.45, 16],
+    [(r) => r.vendor === 'AWS', 'AWS Neuron', 0.58, 0.40, 18],
+    [() => true, 'Huawei Ascend (CANN)', 0.55, 0.38, 20],
+  ];
+  const tokProf = (r) => TOK_PROF.find((p) => p[0](r));
+  const fastLink = (r) => (r.scale_up_gbs || 0) >= 300 || /OAM|SXM|Superchip|Cloud-only/.test(r.form_factor || '');
+  function tokEstimate(r, m, B0) {
+    let B = B0;
     const bw = r.mem_bw_tbs, mem = r.memory_gb; if (!bw || !mem) return null;
+    const [, pname, uMem, uCmp, lat] = tokProf(r);
     let best = null;
+    const PF = B === 'pf'; if (PF) B = 1;
     m.cand.forEach(([prec, bpp, cmpK, fixedW], ci) => {
-      const tf = cmpK.split('|').map((k) => (k === 'fp8' ? r.fp8_tflops : r.bf16_tflops)).find((x) => x != null);
+      let tf = cmpK.split('|').map((k) => (k === 'fp8' ? r.fp8_tflops : r.bf16_tflops)).find((x) => x != null);
       if (tf == null) return;
+      // prompt reading runs big matrix multiplies, so it uses the fastest format the weights allow: native MXFP4 on chips with FP4 units
+      const tfPf = prec === 'MXFP4' && r.fp4_tflops ? r.fp4_tflops : tf;
       const W = fixedW || m.params * bpp; // GB of weights held in memory
       const kvGB = (B * TOK_CTX * m.kv) / 1e9;
       const N = [1, 2, 4, 8].find((n) => W + kvGB <= 0.9 * mem * n); if (!N) return;
-      if (best && (N > best.N || (N === best.N))) return; // fewest GPUs wins; ties keep the higher-quality precision listed first
-      const tp = Math.pow(0.9, Math.log2(N));
+      if (best && N >= best.N) return; // fewest GPUs wins
+      const tp = Math.pow(0.92, Math.log2(N));
+      // bytes moved per decode step: weights (MoE: only the experts the batch touches) + every user's KV cache
       const readGB = m.moe ? m.moe.fixedGB + m.moe.expertGB * (1 - Math.pow(1 - m.moe.topk / m.moe.experts, B)) : W;
-      const effM = m.moe ? 0.4 : 0.7;
-      const tMem = (readGB + kvGB) / (N * bw * 1000 * effM * tp); // seconds per decode step (bw in TB/s -> GB/s)
-      const tCmp = (B * 2 * m.active * 1e9) / (N * tf * 1e12 * 0.5 * tp);
-      const step = Math.max(tMem, tCmp);
-      best = { prec, N, ci, agg: B / step, user: 1 / step, bound: tMem >= tCmp ? 'memory-bandwidth bound' : 'compute bound' };
+      const effM = uMem * (m.moe ? 0.6 : 1);
+      const tMem = (readGB + kvGB) / (N * bw * 1000 * effM * tp);
+      // operations per step: 2 per active weight + attention over the context, for every user in the batch
+      const flops = B * (2 * m.active * 1e9 + 4 * m.layers * TOK_CTX * m.dAttn);
+      const tCmp = flops / (N * tf * 1e12 * uCmp * tp);
+      // the two overlap imperfectly, so blend rather than take the max; then add the fixed per-layer costs and,
+      // across GPUs, two all-reduces per layer (fast over NVLink / Infinity Fabric / ICI, slow over PCIe)
+      const tOv = m.layers * lat * 1e-6 + (N > 1 ? m.layers * 2 * (fastLink(r) ? 6 : 25) * 1e-6 : 0);
+      const step = Math.pow(Math.pow(tMem, 4) + Math.pow(tCmp, 4), 0.25) + tOv;
+      if (PF) { // prefill: a 2,048-token prompt goes through as one batch; time is compute plus one pass over the weights and the per-layer costs
+        const pfFlops = TOK_CTX * (2 * m.active * 1e9 + 2 * m.layers * TOK_CTX * m.dAttn);
+        const tPf = pfFlops / (N * tfPf * 1e12 * uCmp * tp) + W / (N * bw * 1000 * effM * tp) + tOv;
+        best = { prec, N, ci, agg: TOK_CTX / tPf, user: TOK_CTX / tPf, prof: pname, bound: `compute-bound, ${fnum(tfPf)} TFLOPS ${tfPf === r.fp4_tflops ? 'FP4' : cmpK.startsWith('fp8') && r.fp8_tflops ? 'FP8' : 'BF16'} peak` };
+        return;
+      }
+      const share = (x) => Math.round((x / step) * 100);
+      best = { prec, N, ci, agg: B / step, user: 1 / step, prof: pname, bound: tMem >= tCmp ? `memory-bound (${share(tMem)}% of step time)` : `compute-bound (${share(tCmp)}% of step time)` };
     });
     return best;
   }
   function drawTok(list, q) {
-    const m = LLMS.find((x) => x.id === q.tkm) || LLMS[1]; const B = Number(q.tkb) === 32 ? 32 : 1;
+    const m = LLMS.find((x) => x.id === q.tkm) || LLMS[1]; const B = q.tkb === 'pf' ? 'pf' : Number(q.tkb) === 32 ? 32 : 1; const PF = B === 'pf';
     const mb = $('#tok-model'); mb.replaceChildren(); LLMS.forEach((x) => { const b = mkEl('button', null, x.name); b.type = 'button'; b.title = x.short; b.setAttribute('aria-pressed', String(x === m)); b.onclick = () => set({ tkm: x.id }); mb.append(b); });
     const lb = $('#tok-load'); lb.replaceChildren(); TOK_LOADS.forEach(([n, t]) => { const b = mkEl('button', null, t); b.type = 'button'; b.setAttribute('aria-pressed', String(n === B)); b.onclick = () => set({ tkb: n === 1 ? null : String(n) }); lb.append(b); });
     const anyN = q.tkg === 'any';
@@ -1743,15 +1781,15 @@
     const cd = all.filter((d) => anyN || d.e.N === 1).sort((a, b) => b.x - a.x); const hiddenMulti = all.length - cd.length;
     const mx = d3.max(cd, (d) => d.x) || 1; const ch = $('#tok-chart'); ch.replaceChildren();
     const fT = (x) => (x >= 100 ? fInt(Math.round(x / 10) * 10) : x >= 10 ? fInt(Math.round(x)) : x.toFixed(1));
-    $('#sheet-chart-sub').textContent = `${m.name} (${m.short}) · ${B === 1 ? 'speed one user sees, tokens generated per second' : 'total tokens per second while serving 32 users at once'} · ${TOK_CTX.toLocaleString()}-token context · ${plural(cd.length, 'GPU')}${anyN ? ' · multi-GPU rows show the whole setup' : ''}`;
+    $('#sheet-chart-sub').textContent = `${m.name} (${m.short}) · ${PF ? 'prompt tokens read per second before the first word appears (compute-bound: cores and clocks decide this)' : B === 1 ? 'speed one user sees, tokens generated per second' : 'total tokens per second while serving 32 users at once'} · ${TOK_CTX.toLocaleString()}-token context · ${plural(cd.length, 'GPU')}${anyN ? ' · multi-GPU rows show the whole setup' : ''}`;
     cd.forEach((d, i) => {
       const row = mkEl('button', 'gx-shr gx-tokr'); row.type = 'button';
-      row.title = `${d.r.model}: ${d.e.prec} on ${plural(d.e.N, 'GPU')}, ${d.e.bound}. Open the datasheet.`;
+      row.title = `${d.r.model}: ${d.e.prec} on ${plural(d.e.N, 'GPU')}, ${d.e.bound}, ${d.e.prof} efficiency profile. Open the datasheet.`;
       const nm = mkEl('span', 'nm'); const dot = mkEl('i'); dot.style.background = vColor(d.r.vendor);
       const lab = mkEl('span', 'tk'); lab.append(document.createTextNode(d.r.model), mkEl('small', null, `${d.e.prec} · ${d.e.N === 1 ? '1 GPU' : d.e.N + ' GPUs'}`));
       nm.append(mkEl('em', null, String(i + 1)), dot, lab);
       const bar = mkEl('span', 'bar'); const f = mkEl('span'); f.style.width = Math.max(1.5, (d.x / mx) * 100) + '%'; f.style.background = vColor(d.r.vendor); bar.append(f);
-      const val = mkEl('span', 'val'); const v1 = mkEl('span'); v1.append(mkEl('b', null, fT(d.x)), mkEl('small', null, ' tok/s')); val.append(v1); if (B !== 1) val.append(mkEl('small', null, `${fT(d.e.user)} per user`));
+      const val = mkEl('span', 'val'); const v1 = mkEl('span'); v1.append(mkEl('b', null, fT(d.x)), mkEl('small', null, ' tok/s')); val.append(v1); if (PF) val.append(mkEl('small', null, `${(TOK_CTX / d.x).toFixed(TOK_CTX / d.x < 1 ? 2 : 1)} s for ${TOK_CTX.toLocaleString()} tokens`)); else if (B !== 1) val.append(mkEl('small', null, `${fT(d.e.user)} per user`));
       row.append(nm, bar, val); row.onclick = () => selectGpu(d.r.model); ch.append(row);
     });
     if (!cd.length) ch.append(mkEl('p', 'gx-note', hiddenMulti ? 'No GPU in this view can hold this model on its own.' : 'No GPU in this view has the memory, bandwidth and compute figures needed for an estimate.'));
@@ -1761,8 +1799,11 @@
       const ul = mkEl('ul');
       [
         'These are not measured results. They come from a simple roofline model using each GPU\'s published memory, bandwidth and dense tensor throughput, so they compare chips on equal terms. Real speeds depend on the serving software (vLLM, TensorRT-LLM, SGLang), drivers, interconnect and settings, and are often 20 to 40% different.',
-        'Each token needs the model weights (and the conversation\'s KV cache) read from memory, and about 2 operations per active parameter. Speed is the slower of the two: memory bytes ÷ bandwidth, or operations ÷ compute. We assume 70% of peak bandwidth for dense models, 40% for the mixture-of-experts model, and 50% of peak compute.',
+        'Each generated token needs the model weights and every user\'s KV cache read from memory, plus about 2 operations per active parameter and the attention over the context. Step time blends memory time (bytes ÷ bandwidth) with compute time (operations ÷ tensor throughput), so bandwidth decides single-user speed while cores and clocks decide how far batching scales. A fixed cost per layer (kernel launches and synchronisation) is added, and across several GPUs two all-reduces per layer, much cheaper over NVLink, Infinity Fabric or TPU links than over PCIe.',
+        'Chips do not reach their datasheet peaks equally. Each architecture gets an efficiency profile for its software stack: e.g. NVIDIA Blackwell data center 82% of peak bandwidth and 55% of peak compute, Hopper 78%/50%, Ada 74%/45%, AMD CDNA 3 64%/42% and CDNA 4 68%/45% (ROCm), Google TPU 72%/55%, Intel Gaudi 62%/45%, AWS Neuron 58%/40%, Huawei Ascend 55%/38%. The mixture-of-experts model reaches 60% of that bandwidth because routing scatters its reads. Hover a row to see the profile and whether it is memory- or compute-bound.',
+        'GPUs with the same memory bandwidth, architecture and software still land close together for one user, because generating one token at a time is limited by how fast weights stream from memory, not by core count or transistors. That matches measured results: B200, B300, GB200 and GB300 all have 8 TB/s HBM3e. Their extra compute shows up with 32 users, where batching makes the work compute-heavy.',
         `Context is ${TOK_CTX.toLocaleString()} tokens per user with a 16-bit KV cache. "32 users" adds 32 KV caches and batches 32 requests per step, which uses compute far better.`,
+        'Prompt reading (prefill) is the step before the first word appears: the whole prompt is processed at once, so it is limited by tensor throughput, not memory. This is where core count, clocks and low-precision units (FP8, FP4) separate GPUs that tie on memory bandwidth, e.g. B300 and GB300 pull ahead of B200 on gpt-oss-120b thanks to their faster FP4 units.',
         'Every GPU runs the same weights, so the ranking compares hardware, not quantization: Llama 3.1 8B in BF16 (16 GB), Llama 3.3 70B in 8-bit (71 GB; FP8 where the chip supports it, otherwise 8-bit weights with 16-bit math) and gpt-oss-120b in its native MXFP4 (about 65 GB). We keep 10% of memory free. When the model and KV cache do not fit on one GPU, tensor parallel across 2, 4 or 8 GPUs is assumed, losing 10% per doubling, and the row shows how many GPUs that takes.',
         'For measured numbers, see the published MLPerf results in each GPU\'s Benchmarks section.',
       ].forEach((t) => ul.append(mkEl('li', null, t)));
