@@ -1397,75 +1397,91 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 
 
 /* =====================================================================
-   MOBILE REDESIGN (phones, up to 720px)
-   1. compact header, key figures as a scrolling chip strip
-   2. chip rows scroll sideways on one line (fixes the datasheet page overflow)
-   3. bigger touch targets, sticky controls, back-to-top button
+   MOBILE (phones, up to 720px) — one spacing system, one block
+   gutter 16 · card padding 16 · gap between blocks 16 · gap inside a card 12 · tight 8
    ===================================================================== */
-#gx-top{display:none}
+#gx-top,.gx-more-strip{display:none}
 @media (max-width:720px){
+  .gx{--m-gutter:16px;--m-pad:16px;--m-gap:16px;--m-in:12px;--m-tight:8px;--m-r:14px;padding-inline:var(--m-gutter)!important;gap:var(--m-gap)!important}
   html,body{overflow-x:clip}
-  .gx{gap:14px!important}
 
-  /* compact header: just the title and the theme button, then a chip strip */
-  .gx-hero{padding:14px 14px 12px!important;gap:10px!important;border-radius:var(--r-lg)}
+  /* header: title + theme button, key figures as a scrolling chip strip */
+  .gx-hero{padding:var(--m-pad)!important;gap:var(--m-in)!important;border-radius:var(--m-r)!important}
   .gx-hero .gx-head{padding:0!important;min-height:36px;display:flex;justify-content:center}
   .gx-hero .gx-head .gx-eyebrow{display:none!important}
   .gx-head h1{font-size:24px!important;line-height:1.15!important;letter-spacing:-.02em!important}
-  .gx-theme{top:12px!important;right:12px!important}
-  .gx-kpis{gap:8px!important;margin:0 -14px!important;padding:2px 14px 4px!important;scroll-padding-inline:14px}
-  .gx-kpi{flex:none!important;flex-direction:row!important;align-items:baseline!important;gap:8px!important;min-height:0!important;height:auto!important;padding:9px 14px!important;border-radius:999px!important;white-space:nowrap}
+  .gx-theme{top:var(--m-in)!important;right:var(--m-in)!important}
+  .gx-kpis{gap:var(--m-tight)!important;margin:0 calc(-1 * var(--m-pad))!important;padding:2px var(--m-pad) 2px!important;scroll-padding-inline:var(--m-pad)}
+  .gx-kpi{flex:none!important;flex-direction:row!important;align-items:baseline!important;gap:var(--m-tight)!important;min-height:0!important;height:auto!important;padding:9px 14px!important;border-radius:999px!important;white-space:nowrap}
   .gx-kpi .kic,.gx-kpi .sub{display:none!important}
   .gx-kpi .lab{order:1;padding:0!important;font-size:12.5px!important}
   .gx-kpi .val{order:2;font-size:17px!important;line-height:1.2!important;letter-spacing:-.01em!important}
 
-  /* map layers and any wrapped chip groups: one sideways row */
-  .gx-layers{flex-wrap:nowrap!important;overflow-x:auto;gap:8px!important;margin:0 -16px;padding:2px 16px 6px;scrollbar-width:none;scroll-snap-type:x proximity}
+  /* sticky filter bar: full-width background, content on the gutter */
+  .gx-nav{margin:0 calc(-1 * var(--m-gutter))!important;padding:var(--m-tight) var(--m-gutter)!important}
+  .gx[data-tab="datasheet"] .gx-nav{padding-top:0!important;padding-bottom:0!important;min-height:0!important}
+
+  /* blocks: same gap everywhere */
+  .gx-panel,.gx-explorer,.gx-grid,.gx-ins{gap:var(--m-gap)!important}
+  .gx-ins{margin:0 calc(-1 * var(--m-gutter))!important;padding:2px var(--m-gutter) 4px!important;gap:var(--m-in)!important;scroll-padding-inline:var(--m-gutter)}
+  .gx-card,.gx-in{padding:var(--m-pad)!important;border-radius:var(--m-r)!important}
+  .gx-card{gap:var(--m-in)!important}
+  .gx-card.gx-side{padding:0!important}
+  .gx-side .gx-sidehead{padding:var(--m-pad) var(--m-pad) var(--m-in)!important}
+  .gx-side .gx-exlist{padding:var(--m-tight) var(--m-tight) var(--m-in)!important}
+  .gx-side .gx-exmore{margin:0 var(--m-pad) var(--m-pad)!important}
+  .gx-card .gx-note{margin:0}
+  .gx-card>.gx-note:first-child{padding:0!important}
+
+  /* sideways scrollers inside a card bleed to the card edge and keep the content edge */
+  .gx-layers{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;overflow-y:hidden!important;gap:var(--m-tight)!important;margin:0 calc(-1 * var(--m-pad))!important;padding:2px var(--m-pad) 6px!important;max-width:none!important;width:auto;scrollbar-width:none;scroll-snap-type:x proximity}
   .gx-layers::-webkit-scrollbar{display:none}
   .gx-layers>*{flex:none}
   .gx-layers button{scroll-snap-align:start}
+  .gx-layers .gx-lgrp{flex:none!important;flex-direction:row!important;align-items:center;gap:var(--m-tight);max-width:none!important}
+  .gx-layers .gx-lgrp,.gx-layers .gx-lrow{flex-wrap:nowrap!important;overflow:visible!important}
+  .gx-layers .gx-lgl{flex:none;font-size:11px;text-transform:none;color:var(--color-fg-muted)}
 
-  /* datasheet: nothing may be wider than the screen */
+  /* datasheet: nothing wider than the screen, chip rows scroll on one line */
+  #datasheet{gap:var(--m-in)!important}
   #datasheet,#datasheet>*,.gx-shfilters,.gx-shfilters>*,#sheet-body,#sv-sheet{min-width:0;max-width:100%}
-  .gx-shrow{flex-wrap:nowrap!important;margin:0 -14px;padding:2px 14px 4px;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
+  #sheet-body{gap:var(--m-in)!important}
+  .gx-shfilters{flex-direction:column;gap:var(--m-tight)}
+  .gx-shrow{flex-wrap:nowrap!important;margin:0 calc(-1 * var(--m-gutter));padding:2px var(--m-gutter) 4px;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
   .gx-shrow .cl{position:sticky;left:0;z-index:1;background:var(--color-bg);padding-right:6px;min-width:0}
   .gx-shrow button{min-height:40px;padding:0 14px}
   #ds-views button{min-height:44px}
   #sheet-q{min-height:46px}
   .gx-lr{min-height:56px}
   .gx-ibtn{min-width:44px;min-height:44px}
+  .gx-gh,.gx-gs{padding:var(--m-pad)!important;border-radius:var(--m-r)!important}
+  .gx-gh{gap:var(--m-in)!important}
+  .gx-gh-name{font-size:24px!important}
   .gx-gh-act .gx-btn{min-height:46px}
+  .gx-ml{border-radius:var(--m-r)}
+  .gx-ml-h{padding:var(--m-in) var(--m-pad)}
+  #gpu-detail{display:flex;flex-direction:column;gap:var(--m-in)}
 
   /* detail view: back + prev/next stay in reach while you read */
-  .gx-gh-top{position:sticky;top:0;z-index:8;margin:-18px -14px 4px;padding:8px 14px;background:var(--color-panel);border-bottom:1px solid var(--gx-line);border-radius:var(--r-md) var(--r-md) 0 0}
-  .gx-sn{top:56px!important}
+  .gx-gh-top{position:sticky;top:0;z-index:8;margin:calc(-1 * var(--m-pad)) calc(-1 * var(--m-pad)) 0;padding:var(--m-tight) var(--m-pad);background:var(--color-panel);border-bottom:1px solid var(--gx-line);border-radius:var(--m-r) var(--m-r) 0 0}
+  .gx-sn{top:56px!important;margin:0!important;padding:5px!important}
   .gx-sn button{min-height:40px}
-  .gx-swipe{display:block;text-align:center;font-size:12px;color:var(--color-fg-muted);margin:-4px 0 2px}
+  .gx-gh-pos{white-space:nowrap}
+  .gx-gh-pos::after{content:" · swipe ↔";color:var(--color-fg-muted);opacity:.8}
+
+  /* rankings: name and value on one line, bar underneath */
+  .gx-shr{grid-template-columns:minmax(0,1fr) auto!important;grid-template-areas:"nm val" "bar bar";gap:6px 10px!important;padding:10px var(--m-tight)!important;min-height:52px}
+  .gx-shr .nm{grid-area:nm;white-space:normal;overflow:visible;align-items:flex-start;line-height:1.3}
+  .gx-shr .val{grid-area:val;font-size:15px}
+  .gx-shr .bar{grid-area:bar;height:8px}
+
+  /* long chart: show the first rows, expand on tap */
+  .gx-card.is-capped #strip{max-height:420px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 calc(100% - 56px),transparent);mask-image:linear-gradient(#000 calc(100% - 56px),transparent)}
+  .gx-more-strip{display:none;min-height:44px}
+  .gx-card.is-capped .gx-more-strip,.gx-card.is-open .gx-more-strip{display:inline-flex}
 
   /* back to top */
   #gx-top{position:fixed;right:14px;bottom:calc(76px + env(safe-area-inset-bottom));z-index:40;display:grid;place-items:center;width:44px;height:44px;border:1px solid var(--gx-line);border-radius:50%;background:var(--color-panel);color:var(--color-fg);box-shadow:0 6px 18px -6px rgba(17,20,24,.35);opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .18s,transform .18s}
   #gx-top.on{opacity:1;transform:none;pointer-events:auto}
   #gx-top svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
-}
-@media (max-width:720px){.gx-gh-pos::after{content:" · swipe to switch";color:var(--color-fg-muted);opacity:.8}}
-@media (max-width:720px){
-  .gx-layers{display:flex!important}
-  .gx-layers .gx-lgrp{flex:none!important;flex-direction:column!important;max-width:none!important}
-  .gx-layers .gx-lgrp,.gx-layers .gx-lrow{flex-wrap:nowrap!important;overflow:visible!important}
-  .gx-gh-pos{white-space:nowrap}
-  .gx-gh-pos::after{content:" · swipe ↔"!important}
-  .gx[data-tab="datasheet"] .gx-nav{padding-top:0!important;padding-bottom:0!important;min-height:0!important}
-  .gx[data-tab="datasheet"] #datasheet{margin-top:-4px}
-}
-@media (max-width:720px){
-  .gx-layers{overflow-x:auto!important;overflow-y:hidden!important;margin:0 -16px!important;padding:2px 16px 6px!important;max-width:none!important;width:auto}
-  .gx-layers .gx-lgrp{flex-direction:row!important;align-items:center;gap:8px}
-  .gx-layers .gx-lgl{flex:none;font-size:11px;text-transform:none;color:var(--color-fg-muted)}
-}
-@media (max-width:720px){
-  /* rankings: name and value on one line, bar underneath, so long names are readable */
-  .gx-shr{grid-template-columns:minmax(0,1fr) auto!important;grid-template-areas:"nm val" "bar bar";gap:6px 10px!important;padding:10px 8px!important;min-height:52px}
-  .gx-shr .nm{grid-area:nm;white-space:normal;overflow:visible;align-items:flex-start;line-height:1.3}
-  .gx-shr .val{grid-area:val;font-size:15px}
-  .gx-shr .bar{grid-area:bar;height:8px}
 }

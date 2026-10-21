@@ -1535,6 +1535,8 @@
       up.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' }); gxEl.append(up);
       let tk = false; addEventListener('scroll', () => { if (tk) return; tk = true; requestAnimationFrame(() => { tk = false; up.classList.toggle('on', window.scrollY > 700); }); }, { passive: true });
     }
+    const stripCard = document.getElementById('strip') && document.getElementById('strip').closest('.gx-card');
+    if (stripCard && !stripCard.querySelector('.gx-more-strip')) { const mb = mkEl('button', 'gx-btn gx-more-strip', 'Show all GPUs'); mb.type = 'button'; stripCard.classList.add('is-capped'); mb.onclick = () => { const open = stripCard.classList.toggle('is-open'); stripCard.classList.toggle('is-capped', !open); mb.textContent = open ? 'Show fewer GPUs' : 'Show all GPUs'; }; stripCard.append(mb); }
     const det = document.getElementById('gpu-detail'); let sx = 0, sy = 0, st = 0;
     if (det) { det.addEventListener('touchstart', (e) => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; st = Date.now(); }, { passive: true });
       det.addEventListener('touchend', (e) => { if (wideMQ.matches || e.target.closest('.gx-sn, table, .gx-scroll, input, select')) return; const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy; if (Math.abs(dx) < 80 || Math.abs(dy) > 45 || Math.abs(dx) < Math.abs(dy) * 2 || Date.now() - st > 600) return; const b = det.querySelector(`.gx-ibtn[aria-label="${dx < 0 ? 'Next GPU' : 'Previous GPU'}"]`); if (b && !b.disabled) b.click(); }, { passive: true }); } }
