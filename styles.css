@@ -1093,6 +1093,7 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 
 @media (max-width:720px){.gx-kpi{padding:var(--s3)!important}.gx-kpi .val{font-size:24px!important}.gx-kpi .lab{padding-right:30px}.gx-head h1{font-size:30px!important}}
 
+@media (min-width:981px){.gx-kpi{min-height:152px!important}}
 /* ===== Quick views ===== */
 .gx-quick{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-22px 0 -16px}
 .gx-quick .ql{font-size:13px;font-weight:500;color:var(--color-fg-muted);margin-right:2px}

@@ -332,7 +332,7 @@
     const list = QUICK.filter((k) => v.famInfo.has(k)); const key = list.join() + '|' + on;
     if (key === quickKey) return; quickKey = key;
     el.hidden = !list.length; el.replaceChildren(); if (!list.length) return;
-    const lab = document.createElement('span'); lab.className = 'ql'; lab.textContent = 'Rent a GPU'; el.append(lab);
+    const lab = document.createElement('span'); lab.className = 'ql'; lab.textContent = 'Find a GPU'; el.append(lab);
     list.forEach((k) => {
       const b = document.createElement('button'); b.type = 'button'; b.textContent = k; b.setAttribute('aria-pressed', String(on === k)); b.title = `Compare ${k} prices, cheapest first`;
       b.onclick = () => set(on === k ? { family: null } : { family: k, vendor: null, tab: 'pricing', csort: 'usd', cdir: 'asc' }); el.append(b);
