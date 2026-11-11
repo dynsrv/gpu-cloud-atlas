@@ -1859,6 +1859,22 @@
   window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(fit, 120); });
 })();
 
+/* header photo: pick one at random on every load, never the same as last time */
+(function () {
+  try {
+    const root = document.documentElement, cs = getComputedStyle(root);
+    let n = 0; while (cs.getPropertyValue('--gx-hero-' + (n + 1)).trim()) n++;
+    if (!n) return;
+    let last = 0; try { last = +localStorage.getItem('gx-hero') || 0; } catch (e) {}
+    let k = 1 + Math.floor(Math.random() * n);
+    if (n > 1 && k === last) k = (k % n) + 1;
+    try { localStorage.setItem('gx-hero', String(k)); } catch (e) {}
+    root.style.setProperty('--gx-hero-img', 'var(--gx-hero-' + k + ')');
+    root.style.setProperty('--gx-hero-img-sm', 'var(--gx-hero-' + k + '-sm)');
+    root.setAttribute('data-gx-hero', String(k));
+  } catch (e) {}
+})();
+
   document.querySelectorAll('#sheet th button').forEach((b) => b.addEventListener('click', () => { const q = P(); const k = b.dataset.s; set({ gsort: k, gdir: q.gsort === k && q.gdir === 'desc' ? 'asc' : q.gsort === k ? 'desc' : (['model', 'arch', 'tdp_w'].includes(k) ? 'asc' : 'desc') }); }));
   document.querySelectorAll('#ds-views button').forEach((b) => b.addEventListener('click', () => { set({ gview: b.dataset.v === 'sheet' ? null : b.dataset.v }); }));
   document.querySelectorAll('.gx-tabs button[data-tab=datasheet]').forEach((b) => b.addEventListener('click', () => requestAnimationFrame(() => { const y = nav.getBoundingClientRect().top + window.scrollY - 4; if (!phone.matches) window.scrollTo({ top: y, behavior: 'smooth' }); })));
