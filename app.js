@@ -352,7 +352,7 @@
     kset('providers', fInt(n)); kset('providers_sub', n === v.provs.length ? 'worldwide' : `of ${fInt(v.provs.length)} total`);
     kset('countries', fInt(byC.size)); kset('countries_sub', topC ? `Most: ${topC[0]} (${topC[1]})` : '');
     kset('owns', n ? fPct(owns / n) : '—'); kset('owns_sub', plural(owns, 'provider'));
-    kset('price_lab', `${fam} median`); kset('price', med == null ? '—' : f$(med)); kset('price_sub', `lowest rate per GPU-hr · ${plural(mins.length, 'provider')}`);
+    kset('price_lab', `${fam} median`); kset('price', med == null ? '—' : f$(med)); kset('price_sub', `per GPU-hr · ${plural(mins.length, 'provider')}`);
     kset('op', opP.length ? fMW(d3.sum(opP, (p) => p.op)) : '—'); kset('op_sub', `disclosed by ${plural(opP.length, 'provider')}`);
     kset('pl', plP.length ? fMW(d3.sum(plP, (p) => p.pl)) : '—'); kset('pl_sub', `disclosed by ${plural(plP.length, 'provider')}`);
 
