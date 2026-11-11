@@ -1676,3 +1676,10 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 
 /* Explore: remove "Where to rent" box (comment a9e7dca6) */
 .gx #ex-chip{display:none!important}
+
+/* map: lighter fills so country labels stay readable (comment 1f8f84c6) */
+.gx:not([data-gx-theme="dark"]){
+  --gx-pv1:#F3F5FE;--gx-pv2:#E4E9FC;--gx-pv3:#D0D9F8;--gx-pv4:#B9C6F3;--gx-pv5:#A0B1EE;--gx-pv6:#879CE8;
+  --gx-lv1:#EFFBF9;--gx-lv2:#DAF5F1;--gx-lv3:#BEEDE6;--gx-lv4:#9FE3DA;--gx-lv5:#7ED8CC;--gx-lv6:#5CCBBD;
+  --gx-pl1:#F5F5FC;--gx-pl2:#E8E9F8;--gx-pl3:#D7DAF3;--gx-pl4:#C3C8EE;--gx-pl5:#AEB5E8;--gx-pl6:#99A1E1;
+}
