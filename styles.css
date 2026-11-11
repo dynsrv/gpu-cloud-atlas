@@ -1798,3 +1798,10 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 
 /* text fields: no teal focus ring on the input itself; the field's blue border shows focus (comment ed03ee77) */
 .gx input[type="search"]:focus,.gx input[type="search"]:focus-visible,.gx input[type="text"]:focus,.gx input[type="text"]:focus-visible,.gx input:not([type]):focus-visible{outline:none!important;box-shadow:none!important}
+
+/* tables: restore vertical scrolling inside the 560px table boxes (comment bc15896a) */
+.gx .gx-card>.gx-tablebox,.gx .gx-tablebox{overflow:auto!important;overscroll-behavior:contain}
+@media (max-width:720px){
+  /* phones: directory cards flow with the page instead of a scroll box inside a scroll */
+  .gx #directory .gx-tablebox{max-height:none!important;overflow:visible!important}
+}
