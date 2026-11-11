@@ -1762,3 +1762,24 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   .gx #directory #dir thead tr::-webkit-scrollbar{display:none}
   .gx #directory #dir tbody tr{margin:0 0 10px!important}
 }
+
+/* ===== header photo background (11 Nov) ===== */
+.gx .gx-hero::before{-webkit-mask-image:none!important;mask-image:none!important;bottom:-28px!important;
+  background:linear-gradient(90deg,rgba(4,6,14,.86) 0%,rgba(4,6,14,.62) 48%,rgba(4,6,14,.30) 100%),linear-gradient(180deg,rgba(4,6,14,.25) 0%,rgba(4,6,14,.55) 100%),var(--gx-hero-img,none) center 38%/cover no-repeat,#0B0C10!important}
+.gx[data-gx-theme="dark"] .gx-hero::before{background:linear-gradient(90deg,rgba(0,0,0,.88) 0%,rgba(0,0,0,.66) 48%,rgba(0,0,0,.36) 100%),linear-gradient(180deg,rgba(0,0,0,.3) 0%,rgba(0,0,0,.6) 100%),var(--gx-hero-img,none) center 38%/cover no-repeat,#000!important}
+@media (max-width:720px){.gx .gx-hero::before{background-image:linear-gradient(180deg,rgba(4,6,14,.72) 0%,rgba(4,6,14,.82) 100%),var(--gx-hero-img-sm,var(--gx-hero-img,none))!important;background-size:cover!important;background-position:center 30%!important;bottom:-20px!important}}
+.gx .gx-hero{padding-bottom:6px!important}
+.gx .gx-hero .gx-head h1{color:#fff!important}
+.gx .gx-hero .gx-take{color:rgba(255,255,255,.78)!important}
+.gx .gx-hero .gx-theme{background:rgba(255,255,255,.12)!important;color:#fff!important;border-color:rgba(255,255,255,.28)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.gx .gx-hero .gx-theme:hover{background:rgba(255,255,255,.22)!important;border-color:rgba(255,255,255,.4)!important}
+.gx .gx-hero .gx-hero-art{opacity:.55;mix-blend-mode:screen}
+.gx .gx-hero{--gx-gblue:#8FA3F5}
+.gx .gx-hero .gx-kpi{--gx-gblue:#1A3FD6}
+.gx[data-gx-theme="dark"] .gx-hero .gx-kpi{--gx-gblue:#6C84EF}
+.gx .gx-hero .gx-kpi{box-shadow:0 1px 2px rgba(0,0,0,.18)!important}
+.gx .gx-hero::before{bottom:-20px!important}
+@media (max-width:720px){.gx .gx-hero::before{bottom:-16px!important}}
+.gx .gx-hero{padding-top:22px!important}
+.gx .gx-hero .gx-theme{top:24px!important}
+@media (max-width:720px){.gx .gx-hero{padding-top:14px!important}.gx .gx-hero .gx-theme{top:14px!important}}
