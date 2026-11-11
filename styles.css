@@ -1718,3 +1718,47 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
     linear-gradient(180deg,#0B1235 0%,#05081A 55%,var(--color-bg) 100%)!important}
 @media (max-width:720px){.gx .gx-hero::before{top:-16px!important}}
 .gx .gx-hero::before{-webkit-mask-image:linear-gradient(180deg,#000 0%,#000 55%,transparent 100%);mask-image:linear-gradient(180deg,#000 0%,#000 55%,transparent 100%)}
+
+/* ===== mobile fixes for iOS / Android (11 Nov) ===== */
+@supports not (overflow:clip){html,body{overflow-x:hidden}.gx{overflow-x:visible}}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+.gx .gx-card>.gx-tablebox,.gx .gx-tablebox{overflow-x:auto!important;-webkit-overflow-scrolling:touch}
+@media (max-width:720px){
+  /* bottom tab bar clears the iOS home indicator / Android gesture bar */
+  .gx .gx-tabs{padding-bottom:calc(4px + env(safe-area-inset-bottom,0px))!important}
+  .gx{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))!important;padding-left:max(16px,env(safe-area-inset-left,0px))!important;padding-right:max(16px,env(safe-area-inset-right,0px))!important}
+  .gx #gx-top{bottom:calc(84px + env(safe-area-inset-bottom,0px))!important}
+  /* search fields read as fields */
+  .gx .gx-msearch,.gx .gx-shq,.gx .gx-exq{background:var(--color-panel)!important;border:1px solid var(--gx-line)!important;border-radius:10px!important}
+  .gx .gx-msearch:focus-within,.gx .gx-shq:focus-within,.gx .gx-exq:focus-within{border-color:var(--gx-gblue)!important}
+  .gx input,.gx select,.gx textarea{font-size:16px}
+  /* segmented switches: one scrollable line instead of wrapping */
+  .gx .gx-seg{flex-wrap:nowrap!important;overflow-x:auto;scrollbar-width:none;max-width:100%}
+  .gx .gx-seg::-webkit-scrollbar{display:none}
+  .gx .gx-seg button{flex:0 0 auto!important;white-space:nowrap}
+  /* cheapest-providers table fits the card */
+  .gx #cheap{table-layout:fixed;width:100%}
+  .gx #cheap th:nth-child(1),.gx #cheap td:nth-child(1){width:46%}
+  .gx #cheap th:nth-child(2),.gx #cheap td:nth-child(2){width:32%}
+  .gx #cheap th:nth-child(3),.gx #cheap td:nth-child(3){width:22%;white-space:nowrap;text-align:right}
+  .gx #cheap th,.gx #cheap td{padding-left:6px!important;padding-right:6px!important;overflow:hidden;text-overflow:ellipsis}
+  .gx #cheap td:nth-child(1){overflow-wrap:anywhere}
+  /* directory cards: HQ on one line, stats aligned right */
+  .gx #directory tbody tr{grid-template-columns:minmax(0,1fr) auto auto!important;column-gap:12px!important}
+  .gx #directory tbody td:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .gx #directory tbody td:nth-child(2) *{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* charts: slightly smaller labels so more fit */
+  .gx .gx-chart svg text{font-size:11.5px}
+}
+/* mobile pass 2: legend spacing, flat directory list */
+.gx .gx-legend{column-gap:16px!important;row-gap:6px!important}
+.gx .gx-legend span{white-space:nowrap}
+@media (max-width:720px){
+  .gx #directory .gx-card:has(#dir){background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}
+  .gx #directory #dir-count{padding:0 0 8px!important}
+  .gx #directory .gx-tablebox{padding:0!important;margin:0!important;overflow:visible}
+  .gx #directory #dir,.gx #directory #dir tbody{width:100%!important;margin:0!important;padding:0!important}
+  .gx #directory #dir thead tr{padding:0 0 10px!important;margin:0!important;border:0!important;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .gx #directory #dir thead tr::-webkit-scrollbar{display:none}
+  .gx #directory #dir tbody tr{margin:0 0 10px!important}
+}

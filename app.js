@@ -213,7 +213,7 @@
   }
   function fail(el) { const d = document.createElement('div'); d.className = 'gx-fail'; d.textContent = 'Failed to load'; el.replaceChildren(d); }
   function emptyNote(el, text) { const d = document.createElement('p'); d.className = 'gx-note'; d.textContent = text; el.replaceChildren(d); }
-  const trunc = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+  const trunc = (s, n) => { s = String(s).replace(/\s*\((?:formerly|incl\.)[^)]*\)/i, ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
   function legend(el, items) {
     el.replaceChildren(...items.map(([label, color, hollow]) => {
       const s = document.createElement('span'); const i = document.createElement('i');
@@ -1838,6 +1838,26 @@
         tr.append(td); });
       tr.onclick = () => selectGpu(r.model); return tr; }));
   }
+
+/* ---- keep right-aligned chart labels inside their chart: shorten with an ellipsis when they would spill past the left edge ---- */
+(function () {
+  let t = 0;
+  const fit = () => {
+    document.querySelectorAll('.gx svg text[text-anchor="end"]').forEach((el) => {
+      if (el.closest('.gx-hero-art') || el.children.length) return;
+      let bb; try { bb = el.getBBox(); } catch (e) { return; }
+      if (!bb.width || bb.x >= 0) return;
+      const full = el.getAttribute('data-full') || el.textContent;
+      el.setAttribute('data-full', full);
+      let s = full;
+      while (s.length > 4) { s = s.slice(0, -1); el.textContent = s.trimEnd() + '…'; if (el.getBBox().x >= 0) break; }
+    });
+  };
+  const mo = new MutationObserver(() => { clearTimeout(t); t = setTimeout(fit, 60); });
+  const start = () => { const root = document.querySelector('.gx') || document.body; mo.observe(root, { childList: true, subtree: true }); fit(); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+  window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(fit, 120); });
+})();
 
   document.querySelectorAll('#sheet th button').forEach((b) => b.addEventListener('click', () => { const q = P(); const k = b.dataset.s; set({ gsort: k, gdir: q.gsort === k && q.gdir === 'desc' ? 'asc' : q.gsort === k ? 'desc' : (['model', 'arch', 'tdp_w'].includes(k) ? 'asc' : 'desc') }); }));
   document.querySelectorAll('#ds-views button').forEach((b) => b.addEventListener('click', () => { set({ gview: b.dataset.v === 'sheet' ? null : b.dataset.v }); }));
