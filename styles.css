@@ -1639,3 +1639,15 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   .gx .gx-tabs [role="tab"]{border-radius:12px!important;font-size:10.5px!important;letter-spacing:-.02em!important;padding-left:2px!important;padding-right:2px!important;min-width:0}
   .gx .gx-tabs [role="tab"] span{white-space:nowrap}
 }
+
+/* ---- tighter corners + smaller title (11 Nov) ---- */
+.gx{--r-sm:6px;--r-md:8px;--r-lg:10px}
+.gx .gx-tabs{border-radius:10px!important}
+.gx .gx-tabs [role="tab"]{border-radius:7px!important}
+.gx .gx-btn,.gx .gx-ibtn,.gx #f-reset,.gx .gx-seg,.gx .gx-seg button,.gx .gx-hero .gx-theme{border-radius:8px!important}
+.gx .gx-search,.gx .gx-search input,.gx .gx-filters .gx-search{border-radius:8px!important}
+.gx .gx-exmode{border-radius:8px!important}.gx .gx-exmode button{border-radius:6px!important}
+.gx .gx-hero .gx-head h1{font-size:clamp(28px,3vw,40px)!important;letter-spacing:-.04em!important}
+@media (max-width:720px){.gx .gx-hero .gx-head h1{font-size:26px!important;letter-spacing:-.035em!important}.gx .gx-tabs{border-radius:12px!important}.gx .gx-tabs [role="tab"]{border-radius:9px!important}}
+@media (max-width:720px){.gx{--m-r:10px!important}}
+@media (max-width:720px){html body .gx .gx-hero,html body .gx .gx-card,html body .gx .gx-in,html body .gx .gx-gh,html body .gx .gx-gs,html body .gx .gx-ml{border-radius:10px!important}html body .gx .gx-kpi,html body .gx .gx-ftoggle{border-radius:8px!important}}
