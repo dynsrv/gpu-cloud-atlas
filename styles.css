@@ -1783,3 +1783,7 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 .gx .gx-hero{padding-top:22px!important}
 .gx .gx-hero .gx-theme{top:24px!important}
 @media (max-width:720px){.gx .gx-hero{padding-top:14px!important}.gx .gx-hero .gx-theme{top:14px!important}}
+
+/* logos: circular chips (comment d5bcaae5) */
+.gx .gx-logo,.gx .gx-logo.sm,.gx .gx-logo.lg{border-radius:50%!important}
+.gx .gx-logo img{box-sizing:border-box;padding:13%;border-radius:50%}
