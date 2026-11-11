@@ -1651,3 +1651,25 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 @media (max-width:720px){.gx .gx-hero .gx-head h1{font-size:26px!important;letter-spacing:-.035em!important}.gx .gx-tabs{border-radius:12px!important}.gx .gx-tabs [role="tab"]{border-radius:9px!important}}
 @media (max-width:720px){.gx{--m-r:10px!important}}
 @media (max-width:720px){html body .gx .gx-hero,html body .gx .gx-card,html body .gx .gx-in,html body .gx .gx-gh,html body .gx .gx-gs,html body .gx .gx-ml{border-radius:10px!important}html body .gx .gx-kpi,html body .gx .gx-ftoggle{border-radius:8px!important}}
+
+/* ---- fixes + polish (11 Nov) ---- */
+/* tab sections and inner wrappers are not cards */
+.gx .gx-panel,.gx .gx-explorer,.gx .gx-tablebox{border:0!important;background:transparent!important;box-shadow:none!important}
+.gx .gx-panel{border-radius:0!important}
+.gx .gx-card>.gx-tablebox{border-radius:0 0 var(--r-lg) var(--r-lg)!important;overflow:hidden}
+/* icon buttons: hairline, consistent 32px squares */
+.gx .gx-ibtn{border:1px solid var(--gx-line)!important;background:var(--color-panel)!important;color:var(--color-fg)!important;border-radius:8px!important;box-shadow:none!important;min-width:32px;min-height:32px;display:inline-grid;place-items:center;transition:background .15s,border-color .15s}
+.gx .gx-ibtn:hover{background:var(--gx-hov)!important;border-color:var(--gx-line-strong)!important}
+.gx .gx-ibtn:disabled{opacity:.4;cursor:default}
+/* insight figures: semibold, tight, tabular */
+.gx .gx-ins .big,.gx .gx-in .big{font-weight:600!important;letter-spacing:-.035em!important;font-variant-numeric:tabular-nums;color:var(--color-fg)}
+/* card section headers: consistent rhythm */
+.gx .gx-card .gx-ch p,.gx .gx-card>p.gx-note{color:var(--color-fg-muted)}
+/* tables: calmer header, row hover */
+.gx table thead th{color:var(--color-fg-muted)!important;font-weight:500!important;font-size:12px!important;letter-spacing:.01em}
+.gx table tbody tr:hover td{background:var(--gx-hov)}
+/* count badges next to GPU names: royal blue tint */
+.gx .gx-card svg .badge rect,.gx .gx-card svg rect.badge{fill:var(--gx-sel)}
+/* sticky section nav on the datasheet: match cards */
+.gx #gpu-detail .gx-gs,.gx .gx-gs{border:1px solid var(--gx-line)!important;border-radius:var(--r-lg)!important;background:var(--color-panel)!important;box-shadow:none!important}
+.gx .gx-gh{border:1px solid var(--gx-line)!important;border-radius:var(--r-lg)!important;box-shadow:none!important}

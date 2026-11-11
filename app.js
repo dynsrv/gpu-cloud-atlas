@@ -1170,7 +1170,7 @@
     const svgTmp = svgFor(el, W, 100, 'Regional GPU mix');
     const lw = measure(svgTmp, regs.map((r) => `${r.r} · ${r.n}`)) + 14;
     const cw = (W - lw - 4) / cols.length;
-    const rot = cw < 64;
+    const rot = cw < 64 || measure(svgTmp, cols) > cw - 8;
     const top = rot ? measure(svgTmp, cols) * 0.72 + 12 : 22;
     const H = top + regs.length * ch + 4;
     const svg = svgFor(el, W, H, 'Share of providers in each region offering each GPU');
