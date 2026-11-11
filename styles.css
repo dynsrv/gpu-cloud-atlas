@@ -1787,3 +1787,11 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 /* logos: circular chips (comment d5bcaae5) */
 .gx .gx-logo,.gx .gx-logo.sm,.gx .gx-logo.lg{border-radius:50%!important}
 .gx .gx-logo img{box-sizing:border-box;padding:13%;border-radius:50%}
+
+/* mobile theme toggle: centred on the title row, clear of the KPI cards (comment 673dfdf6) */
+@media (max-width:720px){
+  .gx .gx-hero .gx-theme{top:4px!important;right:0!important;width:32px!important;height:32px!important;min-width:0!important;padding:0!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;border-radius:50%!important}
+  .gx .gx-hero .gx-theme .i{width:16px!important;height:16px!important;margin:0!important}
+  .gx .gx-hero .gx-head h1{padding-right:44px!important}
+  .gx .gx-hero::before{top:-48px!important}
+}
