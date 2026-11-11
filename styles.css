@@ -1795,3 +1795,6 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   .gx .gx-hero .gx-head h1{padding-right:44px!important}
   .gx .gx-hero::before{top:-48px!important}
 }
+
+/* text fields: no teal focus ring on the input itself; the field's blue border shows focus (comment ed03ee77) */
+.gx input[type="search"]:focus,.gx input[type="search"]:focus-visible,.gx input[type="text"]:focus,.gx input[type="text"]:focus-visible,.gx input:not([type]):focus-visible{outline:none!important;box-shadow:none!important}
