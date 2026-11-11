@@ -1683,3 +1683,24 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
   --gx-lv1:#EFFBF9;--gx-lv2:#DAF5F1;--gx-lv3:#BEEDE6;--gx-lv4:#9FE3DA;--gx-lv5:#7ED8CC;--gx-lv6:#5CCBBD;
   --gx-pl1:#F5F5FC;--gx-pl2:#E8E9F8;--gx-pl3:#D7DAF3;--gx-pl4:#C3C8EE;--gx-pl5:#AEB5E8;--gx-pl6:#99A1E1;
 }
+
+/* header without a box: title + KPI cards on the page, aligned to the content edges; globe art bleeds to the browser edge (comment 2339612b) */
+.gx{overflow-x:clip}
+.gx .gx-hero{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;padding:4px 0 0!important;overflow:visible!important}
+.gx .gx-hero::before{display:none!important}
+.gx .gx-hero .gx-hero-art{right:calc((100% - 100vw) / 2)!important;top:-24px!important;z-index:-1}
+.gx .gx-hero .gx-theme{top:4px!important;right:0!important}
+.gx .gx-hero .gx-kpi{background:var(--color-panel)!important;border:1px solid var(--gx-line)!important}
+@media (max-width:720px){
+  html body .gx .gx-hero{padding:0!important;border-radius:0!important}
+  .gx .gx-hero .gx-hero-art{right:calc((100% - 100vw) / 2)!important;top:-16px!important}
+}
+.gx .gx-hero .gx-hero-art{width:460px!important;height:460px!important;bottom:auto!important;top:-90px!important;left:auto!important;max-height:none!important}
+@media (max-width:720px){.gx .gx-hero .gx-hero-art{width:300px!important;height:300px!important;top:-70px!important}}
+.gx .gx-hero .gx-hero-art{transform:none!important;top:-56px!important}
+@media (max-width:720px){.gx .gx-hero .gx-hero-art{top:-60px!important}}
+.gx .gx-hero .gx-hero-art{-webkit-mask-image:linear-gradient(180deg,#000 0%,#000 30%,transparent 54%);mask-image:linear-gradient(180deg,#000 0%,#000 30%,transparent 54%)}
+@media (max-width:720px){.gx .gx-hero .gx-hero-art{-webkit-mask-image:linear-gradient(180deg,#000 0%,#000 35%,transparent 62%);mask-image:linear-gradient(180deg,#000 0%,#000 35%,transparent 62%)}}
+.gx .gx-hero .gx-hero-art{-webkit-mask-image:linear-gradient(180deg,#000 0%,#000 24%,transparent 44%);mask-image:linear-gradient(180deg,#000 0%,#000 24%,transparent 44%)}
+.gx .gx-hero .gx-hero-art{-webkit-mask-image:linear-gradient(180deg,#000 0%,#000 20%,transparent 40%);mask-image:linear-gradient(180deg,#000 0%,#000 20%,transparent 40%)}
+.gx .gx-hero::after{display:none!important}
