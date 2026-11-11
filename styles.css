@@ -1673,3 +1673,6 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 /* sticky section nav on the datasheet: match cards */
 .gx #gpu-detail .gx-gs,.gx .gx-gs{border:1px solid var(--gx-line)!important;border-radius:var(--r-lg)!important;background:var(--color-panel)!important;box-shadow:none!important}
 .gx .gx-gh{border:1px solid var(--gx-line)!important;border-radius:var(--r-lg)!important;box-shadow:none!important}
+
+/* Explore: remove "Where to rent" box (comment a9e7dca6) */
+.gx #ex-chip{display:none!important}
