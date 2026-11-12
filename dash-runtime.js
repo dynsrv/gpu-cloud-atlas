@@ -1,7 +1,7 @@
 /* Standalone stand-in for the dashboard host: loads the datasets, keeps filter state in the URL. */
 (function () {
   const DEFAULTS = { category: null, country: null, dir: 'desc', family: null, metric: 'providers', ownership: null, pgroup: 'region', q: null, region: null, sel: null, sort: 'op_mw', tab: 'overview' };
-  const SETS = ['providers', 'prices', 'gpu_families', 'countries', 'world_map', 'dc_cities', 'flags', 'logos', 'provider_details', 'gpu_specs'];
+  const SETS = ['providers', 'prices', 'gpu_families', 'countries', 'world_map', 'dc_cities', 'flags', 'logos', 'provider_details', 'gpu_specs', 'price_changes'];
   // the dashboard draws as soon as these arrive; the rest fill in after
   const CORE = ['providers', 'prices', 'gpu_families'];
   const store = {}; SETS.forEach((id) => { store[id] = { status: 'loading', data: null }; });
@@ -32,7 +32,7 @@
   // 1) everything the first screen draws: fetched together, rendered once (no half-drawn map, no second full render)
   const q0 = readUrl();
   const FIRST = ['providers', 'prices', 'gpu_families', 'countries', 'world_map', 'dc_cities']
-    .concat(q0.tab === 'datasheet' ? ['gpu_specs'] : [], q0.sel || q0.tab === 'directory' ? ['provider_details', 'flags', 'logos'] : []);
+    .concat(q0.tab === 'datasheet' ? ['gpu_specs'] : [], q0.tab === 'pricing' ? ['price_changes'] : [], q0.sel || q0.tab === 'directory' ? ['provider_details', 'flags', 'logos'] : []);
   const LATE = SETS.filter((id) => !FIRST.includes(id));
   Promise.all(FIRST.map((id) => load(id, CORE.includes(id) ? 'high' : 'auto'))).then(() => {
     fire();
