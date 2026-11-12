@@ -1838,3 +1838,20 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 @media (max-width:720px){.gx .gx-chg-t td,.gx .gx-chg-t th{padding:8px 6px;font-size:13px}.gx .gx-chg-t td:nth-child(2){white-space:normal}}
 @media (max-width:720px){.gx .gx-chg-t th:nth-child(4),.gx .gx-chg-t td:nth-child(4){display:none}.gx .gx-chg-t{table-layout:fixed}.gx .gx-chg-t th:nth-child(1){width:34%}.gx .gx-chg-t th:nth-child(2){width:28%}}
 @media (max-width:720px){.gx .gx-chg-t th:nth-child(1){width:31%}.gx .gx-chg-t th:nth-child(2){width:25%}.gx .gx-chg-t th:nth-child(6){width:24%}.gx .gx-chg-t td{overflow-wrap:anywhere}}
+
+/* desktop: fixed, consistent column widths for the price tables (comment cd78f6b7) */
+@media (min-width:721px){
+  .gx .gx-chg-t{table-layout:fixed}
+  .gx .gx-chg-t th:nth-child(1){width:24%}.gx .gx-chg-t th:nth-child(2){width:18%}.gx .gx-chg-t th:nth-child(3){width:22%}
+  .gx .gx-chg-t th:nth-child(4),.gx .gx-chg-t th:nth-child(5){width:11%}.gx .gx-chg-t th:nth-child(6){width:14%}
+  .gx .gx-chg-t td{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gx #cheap{table-layout:fixed;width:100%}
+  .gx #cheap th:nth-child(1){width:34%}.gx #cheap th:nth-child(2){width:24%}.gx #cheap th:nth-child(3){width:26%}.gx #cheap th:nth-child(4){width:16%}
+  .gx #cheap td{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gx #cheap td:first-child{overflow:visible}
+}
+@media (min-width:721px){
+  .gx #cheap th:nth-child(1){width:30%}.gx #cheap th:nth-child(2){width:22%}.gx #cheap th:nth-child(3){width:26%}.gx #cheap th:nth-child(4){width:22%}
+  .gx #cheap td:nth-child(3){white-space:normal;overflow:visible;line-height:1.3}
+  .gx #cheap td.n{overflow:visible}
+}
