@@ -1875,6 +1875,103 @@
   } catch (e) {}
 })();
 
+/* Price changes: summary card on the Pricing tab + change badges in "Providers by price" */
+(function () {
+  const MODELS = ['On-demand', 'Commitment', 'Spot', 'Serverless'];
+  const st = { m: 'All', dir: 'all' };
+  const f$ = (v) => v == null ? '—' : '$' + (v >= 100 ? Math.round(v).toLocaleString('en-US') : v >= 10 ? v.toFixed(1) : v.toFixed(2));
+  const fd = (s) => { try { return new Date(s + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }); } catch (e) { return s; } };
+  const el = (t, c, txt) => { const e = document.createElement(t); if (c) e.className = c; if (txt != null) e.textContent = txt; return e; };
+  const pct = (o, n) => (o && n != null) ? (n - o) / o * 100 : null;
+  function lines(D) {
+    const out = [];
+    (D.items || []).forEach((it) => {
+      if (it.kind === 'removed') { out.push({ it, m: 'Removed', term: '', o: it.old_usd, n: null, k: 'removed' }); return; }
+      const mc = it.model_changes && it.model_changes.length ? it.model_changes : [{ m: it.basis_model || 'On-demand', term: '', o: it.old_usd, n: it.new_usd }];
+      mc.forEach((c) => { const k = c.o == null ? 'new' : c.n == null ? 'dropped' : c.n < c.o ? 'down' : c.n > c.o ? 'up' : 'same'; if (k !== 'same') out.push({ it, m: c.m, term: c.term || '', o: c.o, n: c.n, k }); });
+    });
+    return out;
+  }
+  function render() {
+    const host = document.getElementById('pricing'); if (!host || !window.dash) return;
+    const d = dash.data('price_changes'); if (d.status !== 'ok' || !d.data) return;
+    const D = d.data; const L = lines(D);
+    let card = document.getElementById('chg-card');
+    if (!card) {
+      card = el('div', 'gx-card gx-chg'); card.id = 'chg-card';
+      const anchor = document.getElementById('price-range-card'); host.insertBefore(card, anchor);
+    }
+    const cnt = (f) => L.filter(f).length;
+    const down = cnt((x) => x.k === 'down'), up = cnt((x) => x.k === 'up'), nw = cnt((x) => x.k === 'new'), gone = cnt((x) => x.k === 'removed' || x.k === 'dropped');
+    card.replaceChildren();
+    const head = el('div', 'gx-ch'); const hd = el('div');
+    hd.append(el('h3', '', `Price changes since ${fd(D.since)}`));
+    hd.append(el('p', 'gx-note', `Checked ${fd(D.date)} against each provider's own pricing page: ${D.checked ? D.checked.providers + ' providers, ' : ''}${L.length} rate changes across ${new Set(L.map((x) => x.it.provider)).size} providers. Every pricing model is compared, not just the cheapest.`));
+    head.append(hd); card.append(head);
+    const kp = el('div', 'gx-chg-k');
+    [['down', 'Cheaper', down, '▼'], ['up', 'Pricier', up, '▲'], ['new', 'New offers', nw, '+'], ['gone', 'Withdrawn', gone, '–']].forEach(([k, lab, v, ic]) => {
+      const b = el('button', 'gx-chg-kpi ' + k); b.type = 'button'; b.setAttribute('aria-pressed', String(st.dir === k));
+      b.append(el('span', 'ic', ic), el('b', '', String(v)), el('span', 'lab', lab));
+      b.addEventListener('click', () => { st.dir = st.dir === k ? 'all' : k; render(); });
+      kp.append(b);
+    });
+    card.append(kp);
+    // by pricing model
+    const seg = el('div', 'gx-seg gx-chg-seg'); seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', 'Pricing model');
+    ['All'].concat(MODELS).forEach((m) => {
+      const n = m === 'All' ? L.length : cnt((x) => x.m === m);
+      if (m !== 'All' && !n) return;
+      const b = el('button', '', `${m} ${n}`); b.type = 'button'; b.setAttribute('aria-pressed', String(st.m === m));
+      b.addEventListener('click', () => { st.m = m; render(); }); seg.append(b);
+    });
+    card.append(seg);
+    const rowsF = L.filter((x) => (st.m === 'All' || x.m === st.m) && (st.dir === 'all' || (st.dir === 'gone' ? (x.k === 'removed' || x.k === 'dropped') : x.k === st.dir)));
+    rowsF.sort((a, b) => Math.abs(pct(b.o, b.n) || 0) - Math.abs(pct(a.o, a.n) || 0) || a.it.provider.localeCompare(b.it.provider));
+    const box = el('div', 'gx-tablebox'); box.style.maxHeight = '420px';
+    const t = el('table', 'gx-chg-t'); const th = el('thead'); const tr0 = el('tr');
+    [['Provider', ''], ['GPU', ''], ['Pricing model', 'hide-narrow'], ['Was', 'n'], ['Now', 'n'], ['Change', 'n']].forEach(([x, c]) => { const h = el('th', c, x); tr0.append(h); });
+    th.append(tr0); t.append(th); const tb = el('tbody');
+    if (!rowsF.length) { const r = el('tr'); const c = el('td', '', 'No changes for this filter.'); c.colSpan = 6; r.append(c); tb.append(r); }
+    rowsF.forEach((x) => {
+      const r = el('tr', 'k-' + x.k); r.dataset.prov = x.it.provider; r.tabIndex = 0;
+      r.title = (x.it.evidence ? '“' + x.it.evidence + '”\n' : '') + (x.it.source_url || '');
+      const pc = pct(x.o, x.n);
+      const chg = x.k === 'new' ? 'New' : x.k === 'removed' ? 'Removed' : x.k === 'dropped' ? 'Dropped' : (pc > 0 ? '▲ +' : '▼ ') + Math.abs(pc).toFixed(Math.abs(pc) < 10 ? 1 : 0) + '%';
+      [[x.it.provider, 'pv'], [x.it.family + (x.it.model && x.it.model !== x.it.family ? '' : ''), ''], [x.m + (x.term ? ' · ' + x.term : ''), 'hide-narrow tm'], [f$(x.o), 'n'], [f$(x.n), 'n'], [chg, 'n ch']].forEach(([v, c]) => r.append(el('td', c, v)));
+      r.addEventListener('click', () => { dash.setParams({ sel: x.it.provider, tab: 'directory' }); });
+      r.addEventListener('keydown', (e) => { if (e.key === 'Enter') r.click(); });
+      tb.append(r);
+    });
+    t.append(tb); box.append(t); card.append(box);
+    card.append(el('p', 'gx-note gx-chg-foot', 'Rates are USD per GPU-hour. Hover a row for the source; click it for the provider profile.'));
+    badges(D);
+  }
+  function badges(D) {
+    const m = {}; (D.items || []).forEach((it) => { if (it.row != null && it.kind !== 'removed') m[it.row] = it; });
+    document.querySelectorAll('#cheap tbody tr[data-key]').forEach((tr) => {
+      const it = m[tr.dataset.key]; const td = tr.querySelector('td.n'); if (!td || td.querySelector('.gx-chg-b')) return;
+      if (!it) return;
+      let k, txt;
+      if (it.kind === 'new') { k = 'new'; txt = 'New'; }
+      else if (it.old_usd != null && it.new_usd != null && it.new_usd !== it.old_usd) { const p = pct(it.old_usd, it.new_usd); k = p < 0 ? 'down' : 'up'; txt = (p < 0 ? '▼' : '▲') + Math.abs(p).toFixed(0) + '%'; }
+      else { k = 'other'; txt = '•'; }
+      const b = el('span', 'gx-chg-b ' + k, txt);
+      b.title = (it.model_changes || []).map((c) => `${c.m}${c.term ? ' (' + c.term + ')' : ''}: ${f$(c.o)} → ${f$(c.n)}`).join('\n') || 'Price changed ' + fd(D.date);
+      td.prepend(b);
+    });
+  }
+  let t = 0;
+  const kick = () => { clearTimeout(t); t = setTimeout(render, 30); };
+  const boot = () => {
+    if (!window.dash) return setTimeout(boot, 200);
+    dash.onData(kick);
+    const mo = new MutationObserver(() => { const d = dash.data('price_changes'); if (d.status === 'ok') badges(d.data); });
+    const go = () => { const tb = document.querySelector('#cheap tbody'); if (tb) mo.observe(tb, { childList: true }); else setTimeout(go, 300); };
+    go();
+  };
+  boot();
+})();
+
   document.querySelectorAll('#sheet th button').forEach((b) => b.addEventListener('click', () => { const q = P(); const k = b.dataset.s; set({ gsort: k, gdir: q.gsort === k && q.gdir === 'desc' ? 'asc' : q.gsort === k ? 'desc' : (['model', 'arch', 'tdp_w'].includes(k) ? 'asc' : 'desc') }); }));
   document.querySelectorAll('#ds-views button').forEach((b) => b.addEventListener('click', () => { set({ gview: b.dataset.v === 'sheet' ? null : b.dataset.v }); }));
   document.querySelectorAll('.gx-tabs button[data-tab=datasheet]').forEach((b) => b.addEventListener('click', () => requestAnimationFrame(() => { const y = nav.getBoundingClientRect().top + window.scrollY - 4; if (!phone.matches) window.scrollTo({ top: y, behavior: 'smooth' }); })));
