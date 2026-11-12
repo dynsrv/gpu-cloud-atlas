@@ -1972,6 +1972,100 @@
   boot();
 })();
 
+/* Pricing analytics card: price index, discount by pricing model, value for money */
+(function () {
+  const st = { tab: 'index', metric: 'usd_per_pflop_hr' };
+  const el = (t, c, txt) => { const e = document.createElement(t); if (c) e.className = c; if (txt != null) e.textContent = txt; return e; };
+  const f$ = (v, d) => v == null ? '—' : '$' + v.toFixed(d != null ? d : (v >= 10 ? 1 : 2));
+  const fd = (s) => { try { return new Date(s + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }); } catch (e) { return s; } };
+  const pc = (a, b) => (a && b != null) ? (b - a) / a * 100 : null;
+  const pill = (p, invert) => { const s = el('span', 'gx-an-p'); if (p == null) { s.textContent = '—'; s.classList.add('nil'); return s; }
+    const r = Math.round(p); s.textContent = (r > 0 ? '+' : r < 0 ? '−' : '±') + Math.abs(r) + '%'; s.classList.add(Math.abs(p) < 0.5 ? 'flat' : (p < 0) !== !!invert ? 'down' : 'up'); return s; };
+  const NS = 'http://www.w3.org/2000/svg';
+  function spark(pts) {
+    const w = 84, h = 24, v = pts.map((p) => p.med), mn = Math.min(...v), mx = Math.max(...v), rg = mx - mn || 1;
+    const svg = document.createElementNS(NS, 'svg'); svg.setAttribute('viewBox', `0 0 ${w} ${h}`); svg.setAttribute('width', w); svg.setAttribute('height', h); svg.setAttribute('class', 'gx-an-sp');
+    const xy = v.map((y, i) => [2 + i * (w - 4) / Math.max(1, v.length - 1), h - 3 - (y - mn) / rg * (h - 6)]);
+    const pl = document.createElementNS(NS, 'polyline'); pl.setAttribute('points', xy.map((p) => p.join(',')).join(' ')); svg.append(pl);
+    const c = document.createElementNS(NS, 'circle'); c.setAttribute('cx', xy[xy.length - 1][0]); c.setAttribute('cy', xy[xy.length - 1][1]); c.setAttribute('r', 2.5); svg.append(c);
+    const t = document.createElementNS(NS, 'title'); t.textContent = pts.map((p) => `${fd(p.d)}: ${f$(p.med)} (${p.n} providers)`).join('\n'); svg.append(t);
+    return svg;
+  }
+  function table(heads, rows, cls) {
+    const box = el('div', 'gx-tablebox'); box.style.maxHeight = '460px'; const t = el('table', 'gx-an-t ' + (cls || ''));
+    const th = el('thead'), tr = el('tr'); heads.forEach(([h, c, tip]) => { const x = el('th', c || '', h); if (tip) x.title = tip; tr.append(x); }); th.append(tr); t.append(th);
+    const tb = el('tbody'); rows.forEach((r) => tb.append(r)); t.append(tb); box.append(t); return box;
+  }
+  function td(v, c) { const x = el('td', c || ''); if (v instanceof Node) x.append(v); else x.textContent = v; return x; }
+  function render() {
+    const host = document.getElementById('pricing'); if (!host || !window.dash) return;
+    const d = dash.data('price_changes'); if (d.status !== 'ok' || !d.data || !d.data.analytics) return;
+    const A = d.data.analytics;
+    let card = document.getElementById('an-card');
+    if (!card) { card = el('div', 'gx-card gx-an'); card.id = 'an-card'; const after = document.getElementById('chg-card'); host.insertBefore(card, after ? after.nextSibling : document.getElementById('price-range-card')); }
+    card.replaceChildren();
+    const hd = el('div', 'gx-ch'), h = el('div'); h.append(el('h3', '', 'Pricing analytics'));
+    h.append(el('p', 'gx-note', `How GPU rental prices are moving, how much commitments and spot save, and what you get per dollar. Based on ${A.dates.length} price checks (${fd(A.dates[0])} – ${fd(A.dates[A.dates.length - 1])}); each provider counts once per GPU.`));
+    hd.append(h); card.append(hd);
+    const seg = el('div', 'gx-seg gx-an-seg'); seg.setAttribute('role', 'tablist');
+    [['index', 'Price index'], ['spread', 'Discount by pricing model'], ['value', 'Value for money']].forEach(([k, lab]) => {
+      const b = el('button', '', lab); b.type = 'button'; b.setAttribute('aria-pressed', String(st.tab === k)); b.addEventListener('click', () => { st.tab = k; render(); }); seg.append(b);
+    });
+    card.append(seg);
+    if (st.tab === 'index') {
+      const first = A.dates[0], prev = A.dates[A.dates.length - 2];
+      const fams = Object.keys(A.index).sort((a, b) => A.index[b][A.index[b].length - 1].n - A.index[a][A.index[a].length - 1].n);
+      let gmx = 0; fams.forEach((f) => { const p = A.index[f][A.index[f].length - 1]; gmx = Math.max(gmx, p.p75); });
+      const rows = fams.map((f) => {
+        const P = A.index[f], cur = P[P.length - 1], p0 = P.find((p) => p.d === first), p1 = P.find((p) => p.d === prev);
+        const r = el('tr'); r.append(td(f, 'gpu'), td(String(cur.n), 'n dim'), td(f$(cur.med), 'n b'));
+        const rg = el('div', 'gx-an-rg'); const bar = el('span', 'bar'); bar.style.left = (cur.p25 / gmx * 100) + '%'; bar.style.width = Math.max(1.5, (cur.p75 - cur.p25) / gmx * 100) + '%';
+        const dot = el('span', 'dot'); dot.style.left = (cur.med / gmx * 100) + '%'; rg.append(bar, dot); rg.title = `Middle 50% of providers: ${f$(cur.p25)} – ${f$(cur.p75)}`;
+        r.append(td(rg, 'rgc'), td(`${f$(cur.p25)}–${f$(cur.p75)}`, 'n dim hide-narrow'));
+        r.append(td(pill(p1 ? pc(p1.med, cur.med) : null), 'n'), td(pill(p0 ? pc(p0.med, cur.med) : null), 'n'), td(spark(P), 'spc hide-narrow'));
+        return r;
+      });
+      card.append(table([['GPU'], ['Providers', 'n'], ['Median', 'n', 'Median of each provider\'s lowest rate, USD per GPU-hour'], ['Spread (25th–75th pct.)', 'rgh'], ['Range', 'n hide-narrow'], ['vs ' + fd(prev), 'n'], ['vs ' + fd(first), 'n'], ['Trend', 'hide-narrow']], rows, 'idx'));
+      card.append(el('p', 'gx-note gx-an-foot', 'Median of each provider\'s lowest published rate (USD per GPU-hour). Bar = middle 50% of providers, dot = median. Changes also reflect providers joining or leaving the list.'));
+    } else if (st.tab === 'spread') {
+      const fams = Object.keys(A.spread).sort((a, b) => A.spread[b].od.n - A.spread[a].od.n);
+      const rows = fams.map((f) => {
+        const s = A.spread[f], r = el('tr'); r.append(td(f, 'gpu'), td(f$(s.od.med), 'n b'));
+        ['commit', 'spot', 'serverless'].forEach((k) => {
+          const c = el('td', 'n');
+          if (s[k]) { const w = el('div', 'gx-an-sv'); w.append(el('span', '', f$(s[k].med)), pill(pc(s.od.med, s[k].med))); w.title = `${s[k].n} providers`; c.append(w); } else c.textContent = '—';
+          r.append(c);
+        });
+        r.append(td(String(s.od.n), 'n dim hide-narrow'));
+        return r;
+      });
+      card.append(table([['GPU'], ['On-demand', 'n'], ['Commitment', 'n'], ['Spot', 'n'], ['Serverless', 'n'], ['On-demand providers', 'n hide-narrow']], rows, 'spr'));
+      card.append(el('p', 'gx-note gx-an-foot', 'Median lowest rate per provider, grouped by the pricing model of that rate; % = difference from the on-demand median. Groups with fewer than 3 providers are left out. Commitment terms vary from 1 month to 4 years.'));
+    } else {
+      const M = { usd_per_pflop_hr: ['$ per PFLOP-hour', 'Median price ÷ BF16 dense compute (PFLOPS). Lower is better value for compute-bound work like training.', 2],
+        usd_per_100gb_hr: ['$ per 100 GB-hour', 'Median price ÷ HBM/VRAM capacity ×100. Lower is better for memory-bound work like serving large models.', 2],
+        usd_per_mtok: ['$ per million tokens', 'Median price ÷ MLPerf Inference Llama 2 70B Offline tokens/s per GPU. Only GPUs with a published result.', 3] };
+      const ms = el('div', 'gx-seg gx-an-ms'); Object.keys(M).forEach((k) => { const b = el('button', '', M[k][0]); b.type = 'button'; b.setAttribute('aria-pressed', String(st.metric === k)); b.addEventListener('click', () => { st.metric = k; render(); }); ms.append(b); });
+      card.append(ms);
+      const V = A.value.filter((v) => v[st.metric] != null).sort((a, b) => a[st.metric] - b[st.metric]);
+      const mx = Math.max(...V.map((v) => v[st.metric]));
+      const list = el('div', 'gx-an-bars');
+      V.forEach((v, i) => {
+        const row = el('div', 'gx-an-br' + (i === 0 ? ' best' : ''));
+        const b = el('div', 'track'); const fill = el('span', 'fill'); fill.style.width = (v[st.metric] / mx * 100) + '%'; b.append(fill);
+        row.append(el('span', 'lab', v.family), b, el('span', 'val', f$(v[st.metric], M[st.metric][2])), el('span', 'sub hide-narrow', `${f$(v.med)}/hr · ${st.metric === 'usd_per_mtok' ? Math.round(v.llama70b_tps).toLocaleString('en-US') + ' tok/s' : st.metric === 'usd_per_100gb_hr' ? v.memory_gb + ' GB' : Math.round(v.bf16_tflops).toLocaleString('en-US') + ' TFLOPS'}`));
+        row.title = `${v.family}: median ${f$(v.med)}/GPU-hr across ${v.n} providers`;
+        list.append(row);
+      });
+      card.append(list);
+      card.append(el('p', 'gx-note gx-an-foot', M[st.metric][1] + ' Specs from the GPU datasheet; prices are medians, so a cheap provider can beat these numbers.'));
+    }
+  }
+  let t = 0; const kick = () => { clearTimeout(t); t = setTimeout(render, 40); };
+  const boot = () => { if (!window.dash) return setTimeout(boot, 200); dash.onData(kick); };
+  boot();
+})();
+
   document.querySelectorAll('#sheet th button').forEach((b) => b.addEventListener('click', () => { const q = P(); const k = b.dataset.s; set({ gsort: k, gdir: q.gsort === k && q.gdir === 'desc' ? 'asc' : q.gsort === k ? 'desc' : (['model', 'arch', 'tdp_w'].includes(k) ? 'asc' : 'desc') }); }));
   document.querySelectorAll('#ds-views button').forEach((b) => b.addEventListener('click', () => { set({ gview: b.dataset.v === 'sheet' ? null : b.dataset.v }); }));
   document.querySelectorAll('.gx-tabs button[data-tab=datasheet]').forEach((b) => b.addEventListener('click', () => requestAnimationFrame(() => { const y = nav.getBoundingClientRect().top + window.scrollY - 4; if (!phone.matches) window.scrollTo({ top: y, behavior: 'smooth' }); })));
